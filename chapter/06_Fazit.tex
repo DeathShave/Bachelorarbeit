@@ -1,0 +1,74 @@
+% !TEX root = ../Thesis.tex
+%%
+%%  Hochschule für Technik und Wirtschaft Berlin --  Abschlussarbeit
+%%
+%% Kapitel 6
+%%
+%%
+
+\chapter{Fazit} \label{Fazit}
+
+
+
+\section{Analyse der Implementierung}
+
+
+
+\subsection{Kostenbetrachtung}
+
+
+\subsubsection{Materialkosten}
+
+
+\subsubsection{Entwicklungskosten iec104}
+
+
+\section{Anwendungsmöglichkeiten}
+
+
+
+\subsection{Anwendungsbereiche von Smart Objects}
+
+
+
+\begin{itemize}
+	\itemsep 0pt
+	\item eHome-Bereich
+	\item Gebäudeautomation
+	\item Industrieautomatisierung
+	\item Logistik
+	\item Smart Grid
+\end{itemize}
+
+\subsection{Anwendungsmöglichkeiten für die Implementierung}
+
+
+
+\subsection{Erweiterungsvorschläge für die Implementierung}
+
+
+
+Eine weitere Verbesserungsmöglichkeit betrifft nicht die Implementierung selbst sondern dem Testaufbau. Als 6LoWPAN-Router wurde ein handelsüblicher PC mit einer Linux-Installation verwendet. Als 6LoWPAN-Schnittstelle wurde ein USB-Stick RZUSBSTICK von Atmel verwendet, der auf dem PC eine Ethernet-Schnittstelle simuliert. Unter anderem hat das den Nachteil, dass auf dem PC der 6LoWPAN-Netzwerkverkehr nicht beobachtet werden kann, weil nur der simulierte Ethernet-Verkehr sichtbar ist. Es wird aber aktuell daran gearbeitet, 6LoWPAN direkt im Linux-Kernel zu implementieren \citep{Ott2012}. Eine eingeschränkte Variante wird schon seit der Kernel Version 3.2.46 unterstützt und laufend erweitert. Als Funkchips werden der MRF24J40 von Microchip und der AT86RF230 von Atmel, der auch im Zigbit-Modul verbaut ist, unterstützt. \citeauthor{Ott2012} stellt eine Hardware vor bestehend aus einem BeagleBone und einem MRF24J40MA Funkchip. Damit kann 6LoWPAN nativ unter Linux verwendet werden ohne zusätzliche Hardware und ohne ein zusätzliches Betriebssystem. Es ist allerdings nicht bekannt, ob es Interoperabilitätsprobleme zwischen der 6LoWPAN-Implementierung im Linux-Kernel und im Contiki-Betriebssystem gibt.
+
+\section{Zusammenfassung}
+
+Es konnte gezeigt werden, dass eine internetfähige Steuerung mithilfe eines 8-bit Mikrocontrollers implementiert werden kann. Das Betriebssystem Contiki stellt dazu den notwendigen TCP/IP-Stack und andere Werkzeuge und Hilfsmittel zur Verfügung. Eine Webserver-Anwendung und eine Vielzahl anderer Anwendungen sind Teil des Betriebssystems. Mit der Contiki-Applikation iec104 wurde gezeigt, dass die Implementierung des Protokolls IEC104 in einer limitierten Umgebung durchaus möglich ist. Auch die Verwendung von IEC104 im Zusammenspiel mit IPv6 hat funktioniert. Bisher war keine Implementierung von IEC104 über IPv6 bekannt. Generell zeigt die Contiki-Applikation iec104, dass die Implementierung neuer internetfähiger Anwendungen möglich und nicht aufwendiger als bei anderen Betriebssystemen ist. Die geringen Ressourcen müssen allerdings bei der Programmierung berücksichtigt werden.
+
+Bei der Implementierung ist der 8KByte große RAM-Speicher die markanteste Ressourcengrenze. Die Auslastung beträgt 88,9\%. Das Hinzufügen von zusätzlichen Contiki"=Applikationen oder das Erweitern der Applikation iec104 ist deswegen nicht ohne Weiteres möglich. Durch den Einsatz von anderer Hardware mit einem größeren RAM-Speicher kann dieses Problem umgangen werden. So steht bei dem AVR Ravenboard mit 16KByte doppelt so viel RAM-Speicher zur Verfügung. Der Hersteller Redwire bietet mit dem Econotag ein fertiges Modul mit USB-Schnittstelle an. Verwendet wird der Freescale MC13224V, der einen 32-bit ARM7 Mikrocontroller mit einer IEEE-802.15.4-Schnittstelle kombiniert. Er verfügt über 128KByte Flash- und 96KByte RAM-Speicher. Das Betriebssystem Contiki unterstützt diese Modul über die Platform redbee-econotag. Beide, das AVR Ravenboard und das Econotag, sind aber für den Einbau in die verwendete Steckdose zu groß.
+
+%\cite{ko11beyond}: In this paper we present two interoperable implementations of the IPv6 protocol stack for LLNs for two leading sensor network operating systems: Contiki and TinyOS. We demonstrate that the two implementations interoperate, but also show that interoperability is not enough. Rather, we expose the fact that subtle differences in different layers of the protocol stack can affect the resulting system performance. 
+
+Als Kommunikationstechnologie wurde 6LoWPAN verwendet. Es scheint ideal für den Einsatz bei ressourcenbeschränkten Geräten zu sein. Anfang dieses Jahres hat die ZigBee Alliance die Spezifikation ZigBee IP veröffentlicht \citep{zigbee-ip}. Damit werden unter der Verwendung von 6LoWPAN vermaschte drahtlose IPv6-Netzwerke unterstützt. Dies ist ein Beispiel dafür, dass die Verwendung von 6LoWPAN in vielen Bereichen voranschreitet. Eine weitere Entwicklung, die die Verbreitung von 6LoWPAN unterstützt, ist die Spezifizierung des Protokolls RPL \citep{RFC6550}. RPL ist ein Routing-Protokoll, das für verlustbehaftete Sensornetze entwickelt worden ist. Die speziellen Anforderungen konnten von existierenden Routing-Protokolle wie OSPF oder RIP nicht erfüllt werden. Die Implementierung von RPL im Betriebssystem Contiki wird ContikiRPL genannt \citep{tsiftes10rpl}.
+
+Sehr wichtig für die weitere Verbreitung von 6LoWPAN ist die Interoperabilität von verschiedenen Implementierungen. \textcite{ko11beyond} haben zwei unabhängige Implementierungen, Contiki und TinyOS, zusammen getestet. Die Interoperabilität zwischen beiden war gegeben, allerdings hatten kleine Unterschiede im jeweiligen Protokollstack einen Einfluss auf die Gesamtsystemleistung. Neben der Interoperabilität ist die Leistungsfähigkeit bei dem Zusammenspiel verschiedener Implementierungen von Bedeutung.
+
+Als weitere Schwierigkeit kommt hinzu, dass viele Implementierungen den Funkempfänger so oft wie möglich ausschalten. Im Betriebssystem Contiki steht diese Funktionalität unter dem Namen ContikiMAC zur Verfügung. So kann der Energieverbrauch um bis zu 80\% reduziert werden \citep{dunkels11contikimac}. Das gesteuerte Ausschalten des Funkempfängers hat allerdings einen markanten Einfluss auf das Kommunikationsverhalten im Netzwerk. Weil keine Spezifikationen oder Standards für diese Funktionalität existieren, verhalten sich Implementierungen sehr verschieden. \textcite{dunkels11adhoc} beschreiben, dass das Zusammenspiel von Kommunikationstechnologie und Ausschaltverhalten des Funkempfängers ein wichtiges Forschungsgebiet für das Internet-of-Things ist.
+
+%Vergleich mit Geschichte des Elektromotors:
+%http://www.udo-leuschner.de/rezensionen/rf9809dittmann.htm
+%Entwicklung des elektrischen Netzes -> elektrische Energie war überall im Haushalt verfügbar. Dadurch konnte der Elektromotor quasi die alleinige Rolle des mechanischen Energielieferanten im Haushalt übernehmen. Am Anfang wurden große Elektromotoren verkauft, an die verschiedene Geräte angeschlossen werden konnten. Mittlerweile hat jedes Gerät einen kleinen Elektromotor. Das Bewusstsein seiner Existenz ist für den Verbraucher dadurch aber noch gesunken, die Technik verschwindet im Hintergrund. Schon seit Anfang der Siebziger Jahre besaß jeder Haushalt 15 bis 20 Elektromotoren.
+%-> Die Technik muss in den Hintergrund treten. Darf quasi nicht bemerkt werden. Dann kann sie erfolgreich sein und sich durchsetzen.
+
+%vermutlich wird es immer eine große Mischung aus Technologien geben.
+
+%sonstige Vorschläge zur weiteren Forschung

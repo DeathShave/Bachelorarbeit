@@ -1,0 +1,42 @@
+% !TEX root = ../Thesis.tex
+%%
+%%  Hochschule für Technik und Wirtschaft Berlin --  Abschlussarbeit
+%%
+%% Kapitel 1
+%%
+%%
+
+\chapter{Einleitung} \label{Einleitung}
+
+\section{Aufgabenbeschreibung} \label{Aufgabenbeschreibung}
+
+Im Rahmen dieser Bachelorarbeit soll eine Lösung geschaffen werden, die eine Videoüberwachung von Wasserbecken ermöglicht. Das System hat den Anspruch robust gegenüber Witterungsbedingungen zu sein und muss den lokalen Gegebenheiten entsprechen. An das Projekt wird die Anforderung gestellt, die gesammelten Bilddaten weiterzugeben oder sich selbst der Verarbeitung anzunehmen.
+
+Das bestehende System basiert auf einer timergesteuerten Reinigung des Wasserbeckens, was hinsichtlich des Verschmutzungsverhaltens unzureichend ist und sich ein Optimierungsbedarf in Bezug auf die Ablaufqualität, des Stromverbrauchs und der Reinigungsmenge abzeichnet. Messbare Anforderungen an die vorgebrachte Lösung bestehen in der Funktionalität einer Air-Gap-Lösung, der Erkennungsqualität, dem verbundenen Wartungsaufwand und der resultierenden Stromersparnis im gesamten Kreislauf.  
+
+\textbf{Ergänzen}: kurze Motivation/Problemkontext (Schwimmschlamm, Einfluss auf Ablaufqualität/Betrieb), sowie klare Zielsetzung als messbare Anforderungen (z.B. Offline/Air-Gap, Latenz, Erkennungsqualität, Wartungsaufwand). Außerdem Beitrag/Abgrenzung: was ist neu gegenüber Timerbetrieb, klassischer Bildverarbeitung oder Sensorik?
+
+In dem weiteren Verfahren werden die Daten zum Training von einem und zur Verarbeitung durch ein Neuronales Netzes eingesetzt. Anhand der Resultate soll die vorhandene Vorrichtung am Nachklärbecken anlaufen.
+
+Mittels Recherche und Rücksprache soll eine Abwägung hinsichtlich der tauglichsten Lösung stattfinden. Der beschlossene Ansatz wird als Prototyp aufgebaut und hinsichtlich seiner Funktionalität bewertet und optimiert. Mit diesem Vorgehen wird angestrebt, am Ende der Arbeit einen gezielten Vergleich der Kosten- und Ressourcenersparnisse aufzuzeigen, was den Grundstein für eine eventuelle Fortsetzung des Projekts legen soll.
+
+
+\section{Herangehensweise}
+
+
+In Kapitel \ref{Grundlagen} werden im Rahmen dieser Arbeit relevante Bezeichnungen erläutert, die aus den Bereichen der Mathematik, Technik aber auch spezifisch aus dem Umfeld des Klärwerks stammen.
+Insbesondere sicherheitsrelevante Standards und Verfahren werden dargelegt, um die Ausgangsposition zu beschreiben. Software und Hardware, die in Anbetracht der Problemstellung Anwendung finden können, werden vorgestellt und hinsichtlich ihrer Nützlichkeit analysiert. Insbesondere auch Umgebungen und Betriebssysteme werden überprüft und auf ihren Nutzen getestet. Die Wahl fiel auf Linux Mint, da es wie das Originale Raspberry Pi OS auf Debian basiert und sich damit wenige Komplikationen ergeben. Ähnliche Distributionen eignen sich ebenfalls und stellen eine Frage der persönlichen Preferenz dar. 
+
+Anschließend wird sich mit der Analyse der unterschiedlichen Ansätze und Bewertung dieser befasst. Es werden im Vorhinein Parameter allgemein definiert, die die Ansprüche an das Projekt klären. Auf dieser Basis erfolgt eine unvoreingenommene Entscheidung, die zum Abschluss der Arbeit kritisch bewertet wird. 
+
+Im Kapitel \ref{Implementierung} werden die einzelnen Aspekte der Implementierung wie die Vorbereitung des Rechners, das Konfigurieren des Raspberry PIs oder die Montage am Nachklärbecken beschrieben.  
+ 
+Es wird daraufhin anhand der Testverfahren gezeigt, welche Wasser- und Stromersparnisse sich durch den bedarfsorientierten Betrieb ergeben und wie stabil das System ist. Diese Tests werden aufgestellt und genauer beschrieben.
+
+Im letzten Kapitel \ref{Fazit} werden die Tests ausgewertet und die Erfüllung der Anforderungen überprüft. Die Anfangs- und Endzustand werden auf ihre Unterschiede hin analysiert und verglichen. Die Skalierbarkeit der Lösung wird betrachtet und eine Fazit des Arbeitsprozesses gezogen. 
+
+
+
+
+
+

@@ -1,0 +1,47 @@
+% !TEX root = ../Thesis.tex
+%%
+%%  Hochschule für Technik und Wirtschaft Berlin --  Abschlussarbeit
+%%
+%% Kapitel 5 - Tests
+%%
+%%
+
+\chapter{Tests} \label{Tests}
+
+
+\section{Herleitung von Test-Cases}
+\textbf{Testmethodik} ausformulieren: Testziele/Hypothesen, Testfälle, Akzeptanzkriterien, Messdauer, Messmittel, sowie Trennung von (a) ML-Evaluierung (mIoU, Precision/Recall, qualitative Beispiele) und (b) Systemtests (Latenz/FPS, Stabilität, Ausfälle, Wartung).
+Testen auf: \\
+Einsparungen im Stromverbrauch \\
+Zuverlässigkeit der Ergebnisse \\
+Resilienz/Wartungsintensität im Alltagsbetrieb \\
+
+\subsection{Funktionale Tests}
+
+Als Aufnahme des Ist-Zustands wurde der Durchflussstrom mittels einer Strommesszange ermittelt, anhand des Typenschilds technische Eckdaten erfasst und die Leistung berechnet. Dieser Wert gilt als Grundlage für den Vorher-/Nachhervergleich und damit als Übersicht für die einzusparende Leistung an dem exemplarischen Nachklärbecken bei Umstieg von einer blinden timer-gesteuerten Lösung im Unterschied zu einer bedarfsorientieren. \\ \\
+
+Dieser prototypische Test soll Aussagekraft darüber liefern, inwieweit sich die Skalierung des erdachten Systems lohnen kann und welche Ersparnisse sich daraus in Bezug auf Betrieb, Strom und Personal ergeben.
+
+\begin{figure}[h]
+    \centering
+    \begin{tabular}{c|c}
+         &  \\
+         & 
+    \end{tabular}
+    \caption{Leistungsberechnung Ist-Zustand}
+    \label{fig:placeholder}
+\end{figure}
+\textbf{Tabelle füllen:} gemessener Strom (A), Spannung (V), Wirkleistung (W), Messzeitraum, Betriebsmodus (Sommer/Winter/Timer), Unsicherheit/Ablesefehler. Alternativ als \texttt{table}-Umgebung statt \texttt{figure}.
+
+\subsection{Leistungstests/Performancetests}
+Zusätzlich zu den Vergleichstest mit den Einsparpotenzialen und Optimierungsmöglichkeiten, bedarf es einer Auflistung der jeweiligen Kostenpunkte, Berechnung des Wartungsaufwands und allgemeiner Probleme, die im laufenden Betrieb aufkommen werden. Die Bewertung eines Prototyps inklusive der Folgen, die sich daraus ergeben, hängt wesentlich von der korrekten Funktion selbst und seiner Beständigkeit ab.  \\ \\
+
+Eine Metrik ist hierbei die Überwachung des Betriebs und ein händischer Abgleich der Ausgabe mit dem Eingang sowie die Beobachtung der Aktorik. \\
+Als weiterer Anhaltspunkt dient ein Protokoll über den zuverlässigen Betrieb des Prototyps und anfallende Reinigungs- und Wartungsarbeiten.
+
+
+
+
+
+\section{Bewertung der Ergebnisse}
+\ldots
