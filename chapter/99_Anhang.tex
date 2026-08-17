@@ -109,6 +109,140 @@ names.sort()
 print(names)
 \end{lstlisting}
 
+\section{Quelltext zur Air-Gap-Toolchain}
+
+Das folgende PowerShell-Skript wurde im Rahmen der Analyse der Air-Gap-Arbeitsumgebung eingesetzt (siehe Abschnitt \ref{Vorarbeit}), um Python-Paketabhängigkeiten offline aufzulösen und die passenden Wheel-Dateien für den Transfer auf das air-gapped System herunterzuladen. Der Kernauszug zur Abhängigkeitsauflösung ist dort im Haupttext gezeigt; hier folgt das vollständige Skript inklusive Parallelisierung und Fortschrittsanzeige.
+
+\begin{lstlisting}[caption=Vollständiges Powershell-Skript zum Download von Wheel-Dateien, label=lst:powershell]
+$Path           = ".\" # Datei ODER Ordnerpfad
+$DownloadDir    = ".\"
+$TargetPython   = "Python_Version"
+$Platform       = "Platform_Variante"
+$MaxThreads     = Anzahl_Threads  # Erhoeht fuer maximale Auslastung
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+if (!(Test-Path $DownloadDir)) { New-Item -ItemType Directory -Path $DownloadDir | Out-Null }
+$GlobalDownloaded = [Hashtable]::Synchronized(@{})
+$TotalBytesToDownload = [long]0
+
+function Format-Size ([long]$bytes) {
+    if ($bytes -gt 1GB) { return "{0:N2} GB" -f ($bytes / 1GB) }
+    return "{0:N2} MB" -f ($bytes / 1MB)
+}
+
+function Get-DependenciesFromWheel {
+    param($Whl)
+    $deps = @()
+    try {
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($Whl)
+        $meta = $zip.Entries | Where-Object { $_.FullName -match "METADATA$" }
+        if ($meta) {
+            $r = New-Object System.IO.StreamReader($meta.Open())
+            while ($l = $r.ReadLine()) { if ($l -match "^Requires-Dist:\s*([^;]+)") { $deps += $Matches[1].Trim() } }
+            $r.Close()
+        }
+        $zip.Dispose()
+    } catch {}
+    return $deps | Select-Object -Unique
+}
+
+$RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
+$RunspacePool.Open()
+$Jobs = New-Object System.Collections.Generic.List[Hashtable]
+
+function Queue-Download {
+    param($RawDep)
+    $name = ($RawDep -split "[\s;>=<\[,! ]")[0].ToLower().Trim()
+    if ([string]::IsNullOrWhiteSpace($name) -or $GlobalDownloaded.ContainsKey($name)) { return }
+
+    $PkgKey = $name.Replace(".","_")
+    if (Get-ChildItem $DownloadDir | Where-Object { $_.Name.ToLower().Replace(".","_").StartsWith($PkgKey + "-") }) {
+        $GlobalDownloaded[$name] = $true; return
+    }
+
+    $GlobalDownloaded[$name] = $true
+    $targetV = $null
+    if ($RawDep -match "==\s*([0-9\.]+)") { $targetV = $Matches[1].TrimEnd('.') }
+
+    $ScriptBlock = {
+        param($PkgName, $SpecificVersion, $Dir, $Target, $Platform)
+        try {
+            $api = Invoke-RestMethod "https://pypi.org/pypi/$PkgName/json"
+            $v = if ($SpecificVersion) { $SpecificVersion } else { $api.info.version }
+            $rel = $api.releases.$v
+            if (!$rel) { $v = $api.info.version; $rel = $api.releases.$v }
+
+            $valid = $rel | Where-Object { $_.filename -match "\.whl$" -and $_.filename -notmatch "macosx|win|aarch64" }
+            $best = $valid | Where-Object { $_.filename -match "cp$Target" -and $_.filename -match $Platform }
+            if (!$best) { $best = $valid | Where-Object { $_.filename -match "py3-none" -and $_.filename -match $Platform } }
+            if (!$best) { $best = $valid | Where-Object { $_.filename -match "py3-none-any" } }
+
+            if ($best) {
+                $file = $best[0]
+                $path = Join-Path $Dir $file.filename
+                (New-Object System.Net.WebClient).DownloadFile($file.url, $path)
+                return @{ Name = $PkgName; Size = $file.size; File = $file.filename; Deps = $api.info.requires_dist }
+            }
+        } catch { return $null }
+    }
+
+    $PS = [PowerShell]::Create().AddScript($ScriptBlock)
+    .AddArgument($name).AddArgument($targetV).AddArgument($DownloadDir)
+    .AddArgument($TargetPython).AddArgument($Platform)
+    $PS.RunspacePool = $RunspacePool
+    $Jobs.Add(@{ PS = $PS; Handle = $PS.BeginInvoke() })
+}
+
+# --- AUTOMATISCHE WEICHENSTELLUNG ---
+Write-Host "`n>>> INITIALISIERE ANALYSE..." -ForegroundColor Cyan
+
+if (Test-Path $Path -PathType Container) {
+    Write-Host "[i] Modus: ORDNER-SCAN ($Path)" -ForegroundColor Gray
+    Get-ChildItem $Path -Filter "*.whl" | ForEach-Object {
+        $name = ($_.Name -split "-")[0].ToLower().Replace(".","_")
+        $GlobalDownloaded[$name] = $true
+        Get-DependenciesFromWheel $_.FullName | ForEach-Object { Queue-Download $_ }
+    }
+} else {
+    Write-Host "[i] Modus: EINZELDATEI-SCAN ($Path)" -ForegroundColor Gray
+    Get-DependenciesFromWheel $Path | ForEach-Object { Queue-Download $_ }
+}
+
+# --- REKURSIVER TURBO-LOOP ---
+while ($true) {
+    $running = $Jobs | Where-Object { $_.Handle.IsCompleted -eq $false }
+    $finished = $Jobs | Where-Object { $_.Handle.IsCompleted -eq $true -and $_.Processed -ne $true }
+
+    foreach ($j in $finished) {
+        $res = $j.PS.EndInvoke($j.Handle)
+        if ($res) {
+            [System.Threading.Interlocked]::Add([ref]$TotalBytesToDownload, $res.Size) | Out-Null
+            if ($res.Deps) { foreach ($nd in $res.Deps) { Queue-Download $nd } }
+            Write-Host "`r  [DONE] $($res.File) ($(Format-Size $res.Size))" -ForegroundColor Green
+        }
+        $j.Processed = $true
+    }
+
+    $localSum = (Get-ChildItem $DownloadDir | Measure-Object -Property Length -Sum).Sum
+    if (!$localSum) { $localSum = 0 }
+    $perc = if ($TotalBytesToDownload -gt 0) { [Math]::Min(100, ($localSum / $TotalBytesToDownload) * 100) } else { 0 }
+
+    Write-Host -NoNewline ("`rFortschritt: $(Format-Size $localSum)) ($ | Aktiv: $($running.Count)   ") -ForegroundColor Yellow
+
+    if ($running.Count -eq 0 -and $finished.Count -eq 0) {
+        Start-Sleep -Seconds 1
+        if (($Jobs | Where-Object { $_.Handle.IsCompleted -eq $false }).Count -eq 0) { break }
+    }
+    Start-Sleep -Milliseconds 400
+}
+
+$RunspacePool.Close()
+Write-Host "`n`n--- FERTIG! ---" -ForegroundColor Cyan
+Pause
+\end{lstlisting}
+
 \section{Bewertungsmetriken}
 
 Die folgenden Metriken und die Post-Training-Quantisierung werden zur Evaluierung des Segmentierungsmodells in Kapitel \ref{Tests} herangezogen.

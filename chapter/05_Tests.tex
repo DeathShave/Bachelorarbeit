@@ -22,16 +22,66 @@ Als Aufnahme des Ist-Zustands wurde der Durchflussstrom mittels einer Strommessz
 
 Dieser prototypische Test soll Aussagekraft darüber liefern, inwieweit sich die Skalierung des erdachten Systems lohnen kann und welche Ersparnisse sich daraus in Bezug auf Betrieb, Strom und Personal ergeben.
 
-\begin{figure}[h]
+Die elektrischen Kenndaten wurden dem Typenschild der Pumpe entnommen, der tatsächlich fließende Strom wurde mit einer Strommesszange gemessen. Die Wirkleistung ergibt sich für den dreiphasigen Anschluss (400\,V) nach $P=\sqrt{3}\cdot U \cdot I \cdot \cos\varphi$ aus dem \emph{gemessenen} Strom, nicht aus dem Typenschild-Nennstrom -- für die Pumpe bestätigt sich der Wert damit rechnerisch: $\sqrt{3}\cdot400\,\text{V}\cdot9,1\,\text{A}\cdot0,89 \approx 5,61\,\text{kW}$.
+
+\begin{table}[h]
     \centering
-    \begin{tabular}{c|c}
-         &  \\
-         & 
+    \begin{tabular}{lrrrrrr}
+        \hline
+        Komponente & $f$ [Hz] & $U$ [V] & $I_{\text{Typenschild}}$ [A] & $\cos\varphi$ & $I_{\text{gemessen}}$ [A] & $P$ [kW] \\
+        \hline
+        Pumpe        & 50 & 400 & 4,8 & 0,89 & 9,1 & 5,61 \\
+        SSR-Schnecke & 50 & 400 & \textit{s. Messprot.} & 0,57 & \textit{s. Messprot.} & 9,10 \\
+        \hline
+        \textbf{Summe} & & & & & & \textbf{14,71} \\
+        \hline
     \end{tabular}
-    \caption{Leistungsberechnung Ist-Zustand}
-    \label{fig:placeholder}
-\end{figure}
-\textbf{Tabelle füllen:} gemessener Strom (A), Spannung (V), Wirkleistung (W), Messzeitraum, Betriebsmodus (Sommer/Winter/Timer), Unsicherheit/Ablesefehler. Alternativ als \texttt{table}-Umgebung statt \texttt{figure}.
+    \caption{Elektrische Kenndaten und berechnete Wirkleistung im Ist-Zustand (Vorher-Zustand, timergesteuerter Betrieb)}
+    \label{tab:LeistungIstZustand}
+\end{table}
+
+\textbf{Zu prüfen:} Strom $I_{\text{gemessen}}$ und Typenschild-Strom der SSR-Schnecke sind im Originalmessprotokoll (Ist-Aufnahme) nicht vollständig auslesbar gewesen -- bitte anhand des Originaldokuments ergänzen, sofern für die Argumentation benötigt.
+
+Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Steuerung ableiten: Der Tagesverbrauch entspricht einer Laufzeit von 4\,h/Tag im Sommerbetrieb und 12\,h/Tag im Winterbetrieb. Tabelle \ref{tab:VerbrauchIstZustand} zeigt die daraus resultierende Hochrechnung des Energieverbrauchs und der Stromkosten, die als Vergleichsbasis für die bedarfsorientierte Lösung dieser Arbeit dient.
+
+\begin{table}[h]
+    \centering
+    \small
+    \begin{tabular}{lrrrr}
+        \hline
+        & \multicolumn{2}{c}{Sommerbetrieb (4\,h/Tag)} & \multicolumn{2}{c}{Winterbetrieb (12\,h/Tag)} \\
+        & Verbrauch [kWh] & Kosten [€] & Verbrauch [kWh] & Kosten [€] \\
+        \hline
+        Pumpe (Tag)        & 22,44 & --    & 67,33  & --     \\
+        Schnecke (Tag)     & 36,40 & --    & 109,20 & --     \\
+        \textbf{Summe (Tag)}   & \textbf{58,84} & \textbf{13,53} & \textbf{176,53} & \textbf{40,60} \\
+        \hline
+        Pumpe (Monat, $\approx$30\,d)     & 673,34  & --    & 2020,01 & --      \\
+        Schnecke (Monat)   & 1092,00 & --    & 3276,00 & --      \\
+        \textbf{Summe (Monat)} & \textbf{1765,34} & \textbf{406,03} & \textbf{5296,01} & \textbf{1218,08} \\
+        \hline
+    \end{tabular}
+    \caption{Verbrauchs- und Kostenprognose des Ist-Zustands nach Betriebsmodus (Strompreis 0,23 €/kWh gemäß Ist-Aufnahme, korrigiert -- Zahlendreher in der Quelle)}
+    \label{tab:VerbrauchIstZustand}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lrr}
+        \hline
+        & Jahr (50:50 Sommer/Winter-Mix) & 10 Jahre \\
+        \hline
+        Pumpe [kWh]         & 16\,384,56 & 163\,845,63 \\
+        Schnecke [kWh]      & 26\,572,00 & 265\,720,00 \\
+        \textbf{Summe [kWh]}    & \textbf{42\,956,56} & \textbf{429\,565,63} \\
+        \textbf{Kosten [€]}     & \textbf{9\,880,01} & \textbf{98\,800,10} \\
+        \hline
+    \end{tabular}
+    \caption{Jahres- und 10-Jahres-Hochrechnung des Ist-Zustands, angenommen je zur Hälfte des Jahres Sommer- bzw. Winterbetrieb}
+    \label{tab:VerbrauchIstZustandJahr}
+\end{table}
+
+Diese Ist-Zustand-Werte bilden die Referenz für den Vorher-/Nachher-Vergleich: Erst mit den entsprechenden Messwerten der bedarfsorientierten, semantisch gesteuerten Lösung lässt sich die tatsächliche Einsparung an Energie und Kosten beziffern.
 
 \subsection{Leistungstests/Performancetests}
 Zusätzlich zu den Vergleichstest mit den Einsparpotenzialen und Optimierungsmöglichkeiten, bedarf es einer Auflistung der jeweiligen Kostenpunkte, Berechnung des Wartungsaufwands und allgemeiner Probleme, die im laufenden Betrieb aufkommen werden. Die Bewertung eines Prototyps inklusive der Folgen, die sich daraus ergeben, hängt wesentlich von der korrekten Funktion selbst und seiner Beständigkeit ab.  \\ \\

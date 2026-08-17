@@ -18,10 +18,9 @@ Im Rahmen des Praktikums fand an erster Stelle eine Einführung in das Unternehm
 
 Ein weiterer Primärstandort war das Klärwerk Waßmannsdorf, in dem ebenfalls ein Großteil der Zeit verbracht wurde. Hier konnten die direkten verfahrenstechnischen Begebenheiten hautnah erlebt und inspiziert werden, was zur Grundlagenbildung enorm beigetragen hat. Das Pilotprojekt findet ebenfalls an diesem Standort statt, was eine hohe Auseinandersetzung mit der Lokalität erforderlich macht.  
 
-\includegraphics[]{pictures/Konfusionsmatrix_hs_analysis.png}
 \subsection{Recherche und Themenfindung}
 
-Im Rahmen der Recherche 
+\textbf{Ergänzen}: Ablauf der Recherche- und Themenfindungsphase (Ausgangsfragestellung, betrachtete Alternativen, warum die Wahl auf semantische Segmentierung/Air-Gap-Edge-Computing fiel).
 
 \subsection{Planung und Umsetzung}
 
@@ -41,25 +40,9 @@ Mittels eines Skripts wurden die erforderlichen Abhängigkeiten (requires-dist) 
 
 
 
-\begin{lstlisting}[caption=Powershell-Skript zum Download von Wheel Dateien]
-$Path           = ".\" # Datei ODER Ordnerpfad
-$DownloadDir    = ".\"
-$TargetPython   = "Python_Version"
-$Platform       = "Platform_Variante"
-$MaxThreads     = Anzahl_Threads  # Erhoeht fuer maximale Auslastung
+Kernstück des Skripts ist die Auflösung der Paketabhängigkeiten direkt aus der \texttt{.whl}-Datei, ohne dass ein PyPI-Client oder eine Internetverbindung auf Laptop 2 nötig ist:
 
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-if (!(Test-Path $DownloadDir)) { New-Item -ItemType Directory -Path $DownloadDir | Out-Null }
-$GlobalDownloaded = [Hashtable]::Synchronized(@{})
-$TotalBytesToDownload = [long]0
-
-function Format-Size ([long]$bytes) {
-    if ($bytes -gt 1GB) { return "{0:N2} GB" -f ($bytes / 1GB) }
-    return "{0:N2} MB" -f ($bytes / 1MB)
-}
-
+\begin{lstlisting}[caption=Kernfunktion des Powershell-Skripts: Abhängigkeitsauflösung aus der Wheel-METADATA]
 function Get-DependenciesFromWheel {
     param($Whl)
     $deps = @()
@@ -75,101 +58,9 @@ function Get-DependenciesFromWheel {
     } catch {}
     return $deps | Select-Object -Unique
 }
-
-$RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
-$RunspacePool.Open()
-$Jobs = New-Object System.Collections.Generic.List[Hashtable]
-
-function Queue-Download {
-    param($RawDep)
-    $name = ($RawDep -split "[\s;>=<\[,! ]")[0].ToLower().Trim()
-    if ([string]::IsNullOrWhiteSpace($name) -or $GlobalDownloaded.ContainsKey($name)) { return }
-    
-    $PkgKey = $name.Replace(".","_")
-    if (Get-ChildItem $DownloadDir | Where-Object { $_.Name.ToLower().Replace(".","_").StartsWith($PkgKey + "-") }) { 
-        $GlobalDownloaded[$name] = $true; return 
-    }
-
-    $GlobalDownloaded[$name] = $true
-    $targetV = $null
-    if ($RawDep -match "==\s*([0-9\.]+)") { $targetV = $Matches[1].TrimEnd('.') }
-
-    $ScriptBlock = {
-        param($PkgName, $SpecificVersion, $Dir, $Target, $Platform)
-        try {
-            $api = Invoke-RestMethod "https://pypi.org/pypi/$PkgName/json"
-            $v = if ($SpecificVersion) { $SpecificVersion } else { $api.info.version }
-            $rel = $api.releases.$v
-            if (!$rel) { $v = $api.info.version; $rel = $api.releases.$v }
-
-            $valid = $rel | Where-Object { $_.filename -match "\.whl$" -and $_.filename -notmatch "macosx|win|aarch64" }
-            $best = $valid | Where-Object { $_.filename -match "cp$Target" -and $_.filename -match $Platform }
-            if (!$best) { $best = $valid | Where-Object { $_.filename -match "py3-none" -and $_.filename -match $Platform } }
-            if (!$best) { $best = $valid | Where-Object { $_.filename -match "py3-none-any" } }
-            
-            if ($best) {
-                $file = $best[0]
-                $path = Join-Path $Dir $file.filename
-                (New-Object System.Net.WebClient).DownloadFile($file.url, $path)
-                return @{ Name = $PkgName; Size = $file.size; File = $file.filename; Deps = $api.info.requires_dist }
-            }
-        } catch { return $null }
-    }
-
-    $PS = [PowerShell]::Create().AddScript($ScriptBlock)
-    .AddArgument($name).AddArgument($targetV).AddArgument($DownloadDir)
-    .AddArgument($TargetPython).AddArgument($Platform)
-    $PS.RunspacePool = $RunspacePool
-    $Jobs.Add(@{ PS = $PS; Handle = $PS.BeginInvoke() })
-}
-
-# --- AUTOMATISCHE WEICHENSTELLUNG ---
-Write-Host "`n>>> INITIALISIERE ANALYSE..." -ForegroundColor Cyan
-
-if (Test-Path $Path -PathType Container) {
-    Write-Host "[i] Modus: ORDNER-SCAN ($Path)" -ForegroundColor Gray
-    Get-ChildItem $Path -Filter "*.whl" | ForEach-Object {
-        $name = ($_.Name -split "-")[0].ToLower().Replace(".","_")
-        $GlobalDownloaded[$name] = $true
-        Get-DependenciesFromWheel $_.FullName | ForEach-Object { Queue-Download $_ }
-    }
-} else {
-    Write-Host "[i] Modus: EINZELDATEI-SCAN ($Path)" -ForegroundColor Gray
-    Get-DependenciesFromWheel $Path | ForEach-Object { Queue-Download $_ }
-}
-
-# --- REKURSIVER TURBO-LOOP ---
-while ($true) {
-    $running = $Jobs | Where-Object { $_.Handle.IsCompleted -eq $false }
-    $finished = $Jobs | Where-Object { $_.Handle.IsCompleted -eq $true -and $_.Processed -ne $true }
-
-    foreach ($j in $finished) {
-        $res = $j.PS.EndInvoke($j.Handle)
-        if ($res) {
-            [System.Threading.Interlocked]::Add([ref]$TotalBytesToDownload, $res.Size) | Out-Null
-            if ($res.Deps) { foreach ($nd in $res.Deps) { Queue-Download $nd } }
-            Write-Host "`r  [DONE] $($res.File) ($(Format-Size $res.Size))" -ForegroundColor Green
-        }
-        $j.Processed = $true
-    }
-
-    $localSum = (Get-ChildItem $DownloadDir | Measure-Object -Property Length -Sum).Sum
-    if (!$localSum) { $localSum = 0 }
-    $perc = if ($TotalBytesToDownload -gt 0) { [Math]::Min(100, ($localSum / $TotalBytesToDownload) * 100) } else { 0 }
-
-    Write-Host -NoNewline ("`rFortschritt: $(Format-Size $localSum)) ($ | Aktiv: $($running.Count)   ") -ForegroundColor Yellow
-
-    if ($running.Count -eq 0 -and $finished.Count -eq 0) { 
-        Start-Sleep -Seconds 1
-        if (($Jobs | Where-Object { $_.Handle.IsCompleted -eq $false }).Count -eq 0) { break }
-    }
-    Start-Sleep -Milliseconds 400
-}
-
-$RunspacePool.Close()
-Write-Host "`n`n--- FERTIG! ---" -ForegroundColor Cyan
-Pause
 \end{lstlisting}
+
+Die Funktion öffnet die \texttt{.whl}-Datei als ZIP-Archiv, liest die enthaltene \texttt{METADATA}-Datei aus und extrahiert daraus sämtliche \texttt{Requires-Dist}-Einträge. Diese werden anschließend rekursiv als weitere Downloads eingereiht (parallelisiert über einen \texttt{RunspacePool}), bis alle Subdependencies aufgelöst sind. Das vollständige Skript inklusive Parallelisierung, Fortschrittsanzeige und Plattform-Filterung ist, da für das Verständnis des Vorgehens nicht unmittelbar erforderlich, in Anhang \ref{Anhang} (Listing \ref{lst:powershell}) hinterlegt.
 
 \begin{figure}[H]
     \centering
@@ -180,15 +71,14 @@ Pause
 
 Wie in \ref{fig:powershell} sichtbar, durchläuft das Skript anhand einer Einzeldatei sämtlich Requires und lädt diese in der passenden Variante parallel über mehrere Threads herunter, damit bei den großen Datenmengen von insbesondere Nvidia Programmen keine überdimensionierten Laufzeiten entstehen. Außerdem wird die Größe des Zielordners und eine Übersicht die Anzahl laufender Prozesse gegeben. Falls die Anforderungen an die Dateiversionen nicht erfüllt werden können, werden stattdessen die none-any-Varianten geladen. Eine vollständige Automatisierung konnte so nicht stattfinden, weswegen einzelne Abhängigkeiten dennoch manuell geladen wurden, aber im Vergleich zur händischen Downloads stellt es trotzdem eine enorme Vereinfachung dar und kann zudem für die Installation des Raspberry PI wiederverwendet werden. \\ \\
 
-Im Rahmen der Arbeit wurden drei unterschiedliche Environments von venv, über Miniconda zu Conda selbst hin vorgenommen. Während Miniconda bereits angenehme Arbeitsweisen ermöglichte, fiel die Wahl letztendlich auf Conda aufgrund preinstalls, da die Anzahl zu installierender Pakete hierdurch deutlich sank. Insbesondere Programme wie PIP wiesen größere Schwierigkeiten auf, da eine Offline-Installation so nicht vorgesehen ist. Der Umschwung auf das umfangreichere Anaconda ermöglichte die problemlosere Installation der weiteren requires, was auch als Option für den Raspberry Pi offen bleibt und nur an Schwierigkeiten mit der Performanz scheitern könnte. \\ \\
+Im Rahmen der Arbeit wurden drei unterschiedliche Environments von venv, über Miniconda zu Conda selbst hin vorgenommen. Während Miniconda bereits angenehme Arbeitsweisen ermöglichte, fiel die Wahl letztendlich auf Conda aufgrund preinstalls, da die Anzahl zu installierender Pakete hierdurch deutlich sank. Insbesondere Programme wie PIP wiesen größere Schwierigkeiten auf, da eine Offline-Installation so nicht vorgesehen ist. Der Umschwung auf das umfangreichere Anaconda ermöglichte die problemlosere Installation der weiteren requires, was auch als Option für den Raspberry Pi offen bleibt und nur an Schwierigkeiten mit der Performanz scheitern könnte.
 
+Innerhalb des so vorbereiteten Conda-Environments (hier beispielhaft \texttt{mud} genannt) werden die zuvor heruntergeladenen Wheel-Dateien anschließend offline und ohne Rückgriff auf PyPI installiert:
 
-
-ARBEIT IM ENVIRONMENT --> Conda (PIP)
-
-
-conda activate mud \\ 
-pip install program --no-index find-links . 
+\begin{lstlisting}[caption=Offline-Installation der Abhängigkeiten im vorbereiteten Conda-Environment, language=bash]
+conda activate mud
+pip install <paket> --no-index --find-links .
+\end{lstlisting}
 
 \section{Produktwahl}
 

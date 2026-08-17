@@ -10,7 +10,52 @@
 
 \section{Aufbau der Implementierung}
 
-\textbf{Ergänzen}: detaillierte Implementierungsbeschreibung (Hardware-Verdrahtung/Stromversorgung/Schutzgehäuse, Kamera+IR+Polfilter, GPIO/Aktorik-Anbindung). Schaltplan/Blockschaltbild als Abbildung einfügen und im Text referenzieren.
+Die Implementierung nutzt ein einzelnes wetterfestes Gehäuse, das am äußeren Ende des in Abschnitt \ref{Implementierung} beschriebenen Aufhängearms unmittelbar unter dem abgewinkelten Blech-Wetterschutz montiert ist. Im Deckel des Gehäuses ist das Kameramodul verbaut (Abbildung \ref{fig:KameraGehaeuseOffen}), im Boden der Raspberry Pi 5 als Recheneinheit (Abbildung \ref{fig:PiGehaeuseOffen}); beide sind über das interne CSI-Flachbandkabel bei geschlossenem Gehäuse miteinander verbunden.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\linewidth]{pictures/Montage/image5.jpeg}
+    \caption{Gehäusedeckel mit montiertem Kameramodul (Flachbandkabel-Anschluss)}
+    \label{fig:KameraGehaeuseOffen}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\linewidth]{pictures/Montage/image9.jpeg}
+    \caption{Gehäuseboden mit Raspberry Pi 5 als Recheneinheit (aktiver Kühlkörper/Lüfter, USB- und Ethernet-Anschlüsse sichtbar)}
+    \label{fig:PiGehaeuseOffen}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.4\linewidth]{pictures/Montage/image3.jpeg}
+    \caption{Geschlossenes Gehäuse mit Kabeldurchführung; wetterfeste Ausführung für den Außeneinsatz}
+    \label{fig:GehaeuseGeschlossen}
+\end{figure}
+
+Bei dem Gehäuse handelt es sich um einen Feuchtraum-Abzweigkasten (Schutzart IP65, Aufputzmontage, Abmessungen 108\,x\,108\,x\,64\,mm, grauer Kunststoff) aus dem Elektrofachhandel -- eine kostengünstige, normgerecht schutzklassifizierte Lösung für den ganzjährigen Außeneinsatz am Nachklärbecken, die Kamera und Recheneinheit gemeinsam unterbringt.
+
+Die Stromversorgung des Raspberry Pi erfolgt über das originale 27\,W-USB-C-Netzteil des Raspberry Pi 5, das über ein Verlängerungskabel bis zu einem separaten, ebenfalls wetterfesten Feuchtraum-Verteilerkasten geführt wird, der die eigentliche Netzanbindung vor Ort herstellt (siehe Verteilerkasten am Beckenrand in Abbildung \ref{fig:MontageVorOrt}).
+
+Die GPIO-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code (\texttt{app.py}) hinterlegt (Tabelle \ref{tab:GPIOBelegung}); sie betrifft ausschließlich die Relaissteuerung des SSR-Antriebs. Die Kamera selbst wird nicht über GPIO, sondern über die CSI-Schnittstelle angebunden und ist davon unabhängig.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{ll}
+        \hline
+        Relais & GPIO-Pin (BCM, Chip 0) \\
+        \hline
+        R1 & 17 \\
+        R2 & 27 \\
+        R3 & 22 \\
+        R4 & 23 \\
+        \hline
+    \end{tabular}
+    \caption{GPIO-Pinbelegung der Relaisansteuerung gemäß \texttt{app.py} (\texttt{RELAY\_PINS})}
+    \label{tab:GPIOBelegung}
+\end{table}
+
+\textbf{Ergänzen}: Länge des internen CSI-Flachbandkabels zwischen Deckel (Kamera) und Boden (Pi) angeben; Belegung/Typ des Relaismoduls (wie viele Kanäle, welcher SSR-Anschluss an welches Relais) sowie Schaltplan/Blockschaltbild (Kamera $\rightarrow$ Raspberry Pi $\rightarrow$ GPIO/Relais $\rightarrow$ SSR-Antrieb) als Abbildung ergänzen.
 
 DARSTELLUNG SCHALTUNG
 
@@ -20,7 +65,33 @@ DARSTELLUNG SCHALTUNG
 
 Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung TS-E/M/Was, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus Aluminium dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser "Arm" über ein Gelenk, was auch bei eingebauter Vorrichtung die Anpassung des Neigungswinkels ändert und somit indirekt den Kamerawinkel modifiziert. Das ist für Testzwecke notwendig um den Winkel mit der geringsten Spiegelung für das Kameramodul zu ermitteln. \\ \\
 
-\textbf{Technische Zeichnung}/Foto der Vorrichtung ergänzen (Maße, Material, Befestigungspunkte, Neigungswinkelbereich). Zusätzlich: Witterungsschutz, Kabelmanagement, Zugriff für Wartung/Reinigung beschreiben.
-TECHNISCHE ZEICHNUNG \\ \\
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.65\linewidth]{pictures/Montage/image6.jpeg}
+    \caption{Aufhängearm aus Aluminium-Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (Bildmitte) und Einhak-Fassung für die Beckenreeling (rechts); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
+    \label{fig:ArmDraufsicht}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.35\linewidth]{pictures/Montage/image7.jpeg}
+    \caption{Seitenansicht des montierten Arms mit Kameragehäuse unterhalb des Wetterschutzblechs und Gelenk zur Neigungswinkelverstellung}
+    \label{fig:ArmSeite}
+\end{figure}
+
+\textbf{Technische Zeichnung}/Maßangaben ergänzen (Länge des Arms, Abmessungen des Wetterschutzblechs, Material-/Legierungsbezeichnung der Profilschiene, Neigungswinkelbereich des Gelenks in Grad).
+
+Am fertig installierten System zeigt sich die Positionierung des Kameragehäuses über der Wasseroberfläche des Nachklärbeckens:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{pictures/Montage/image1.jpeg}
+    \caption{Installierter Aufhängearm am Nachklärbecken (Klärwerk Waßmannsdorf), Kameragehäuse über der Wasseroberfläche positioniert}
+    \label{fig:MontageVorOrt}
+\end{figure}
+
+Witterungsschutz: Das Gehäuse ist als IP65-Feuchtraum-Abzweigkasten wetterfest ausgeführt (siehe Abbildung \ref{fig:GehaeuseGeschlossen} sowie Abschnitt \ref{Implementierung}) und zusätzlich durch das angewinkelte Blech über dem Deckel vor direkter Sonneneinstrahlung und Niederschlag geschützt, was zugleich zur Reduktion von Lichtreflexionen auf der Wasseroberfläche beiträgt. Die Stromversorgung erfolgt über das USB-C-Netzteil des Raspberry Pi mit Verlängerung bis zum Feuchtraum-Verteilerkasten am Beckenrand (siehe Abbildung \ref{fig:MontageVorOrt}).
+
+\textbf{Ergänzen}: Kabelführung entlang des Arms und Zugentlastung sowie exakte Kabellänge angeben; Zugriff für Wartung/Reinigung beschreiben (Muss die Vorrichtung zum Öffnen des Gehäuses ausgehakt werden? Reinigungsintervall des Wetterschutzblechs?).
 
 PROTOKOLL \\ \\

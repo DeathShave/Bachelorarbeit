@@ -115,7 +115,7 @@ Die Anpassung der Gewichte $w_{ij}$ erfolgt anschließend über Backpropagation,
      w_{ij}=w_{ij}+\Delta w_{ij}-\eta \frac{ \partial E}{\partial w_{ij}}
 \end{equation}
 
-Backpropagation beschreibt die \say{Rückwärtsausbreitung von Fehlern} und dient der Adjustierung der Modellgewichte anhand der Abweichung zwischen Vorhersage und tatsächlichem Wert. Für jede Gleichung im Netz wird dabei ein Vektor von Ableitungen bestimmt, auf dessen Grundlage Optimierungsalgorithmen wie Adam die Gewichte richtungsbezogen anpassen, um die Verlustfunktion zu minimieren.
+Backpropagation beschreibt die \say{Rückwärtsausbreitung von Fehlern} und dient der Adjustierung der Modellgewichte anhand der Abweichung zwischen Vorhersage und tatsächlichem Wert. Für jede Gleichung im Netz wird dabei ein Vektor von Ableitungen bestimmt, auf dessen Grundlage Optimierungsalgorithmen wie Adam \cite{Kingma_2015} die Gewichte richtungsbezogen anpassen, um die Verlustfunktion zu minimieren.
 
 Mittels der Faltungsmatrix wird die regulär eine zwei- bis dreidimensionale Matrix als Input verarbeitet, was zu einer Aktivierung führt. Bei repetitiver Ausführung dieses Schritts zeichnet sich eine Feature Map als Karte dieser Aktivierungen ab. Mit Convolutional Layern werden mehrere dieser datensatzspezifischen Filter gleichzeitig erlernt und dadurch die Erkennung von typischen Merkmalen gestärkt.
 
