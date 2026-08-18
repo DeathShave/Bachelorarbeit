@@ -60,8 +60,6 @@ Die \textbf{GPIO}\index{GPIO}-Pinbelegung für die Relais-/Aktorikansteuerung is
 
 DARSTELLUNG SCHALTUNG
 
-\textbf{Hinweis für den noch zu schreibenden Quelltext-Abschnitt (z.B. 4.1.3):} Quelltext hier nur zeigen, falls für das Verständnis unabdingbar; ansonsten Verweis auf Abschnitt \ref{Konzept} bzw. Anhang \ref{Anhang} (siehe dortiger Hinweis zu Quelltext-Auslagerung).
-
 \section{Montage/Vorrichtung}
 
 Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung \textbf{TS-E/M/Was}\index{TS-E/M/Was}, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus Aluminium dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser
@@ -70,7 +68,7 @@ Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur
 \begin{figure}[ht]
     \centering
     \includegraphics[width=0.65\linewidth]{pictures/Montage2/IMG_0044.jpg}
-    \caption{Aufhängearm aus Aluminium-Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (Bildmitte) und Einhak-Fassung für die Beckenreeling (rechts); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
+    \caption{Aufhängearm aus Aluminium-Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (links) und Einhak-Fassung für die Beckenreeling (Bildmitte); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
     \label{fig:ArmDraufsicht}
 \end{figure}
 
@@ -93,7 +91,8 @@ Am fertig installierten System zeigt sich die Positionierung des Kameragehäuses
 \end{figure}
 
 Witterungsschutz: Das Gehäuse ist als IP65-Feuchtraum-Abzweigkasten wetterfest ausgeführt (siehe Abbildung \ref{fig:GehaeuseGeschlossen} sowie Abschnitt \ref{Implementierung}) und zusätzlich durch das angewinkelte Blech über dem Deckel vor direkter Sonneneinstrahlung und Niederschlag geschützt, was zugleich zur Reduktion von Lichtreflexionen auf der Wasseroberfläche beiträgt. Die Stromversorgung erfolgt über das USB-C-Netzteil des Raspberry Pi mit Verlängerung bis zum Feuchtraum-Verteilerkasten am Beckenrand (siehe Abbildung \ref{fig:MontageVorOrt}).
+\\ \\
 
-\textbf{Ergänzen}: Kabelführung entlang des Arms und Zugentlastung sowie exakte Kabellänge angeben; Zugriff für Wartung/Reinigung beschreiben (Muss die Vorrichtung zum Öffnen des Gehäuses ausgehakt werden? Reinigungsintervall des Wetterschutzblechs?).
+Die Führung des 1,2 M langen Kabels wurde mit mehreren Kabelbindern realisiert. Hierbei wurde etwas Spielraum gelassen, damit der Arm für Wartungsarbeiten am verstellbaren Gelenk umgeklappt werden kann. So ist für die Wartung kein zusätzlicher Aufwand nötig.
 
-PROTOKOLL \\ \\
+Aufgrund der Länge des Kabels wurde ein Verlängerungskabel verbunden, das für den Außeneinsatz gedacht und mit der Reling per separatem Kabelschaft verschraubt ist. 

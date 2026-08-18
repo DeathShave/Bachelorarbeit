@@ -18,7 +18,7 @@ Resilienz/Wartungsintensität im Alltagsbetrieb \\
 
 \subsection{Funktionale Tests}
 
-Als Aufnahme des Ist-Zustands wurde der Durchflussstrom mittels einer Strommesszange ermittelt, anhand des Typenschilds technische Eckdaten erfasst und die Leistung berechnet. Dieser Wert gilt als Grundlage für den Vorher-/Nachhervergleich und damit als Übersicht für die einzusparende Leistung an dem exemplarischen Nachklärbecken bei Umstieg von einer blinden timer-gesteuerten Lösung im Unterschied zu einer bedarfsorientieren. \\ \\
+Als Aufnahme des Ist-Zustands wurde der Durchflussstrom mittels einer Strommesszange ermittelt, anhand des Typenschilds technische Eckdaten erfasst und die Leistung berechnet. Dieser Wert gilt als Grundlage für den Vorher-/Nachhervergleich und damit als Übersicht für die einzusparende Leistung an dem exemplarischen Nachklärbecken bei Umstieg von einer blinden timer-gesteuerten Lösung im Unterschied zu einer bedarfsorientieren.
 
 Dieser prototypische Test soll Aussagekraft darüber liefern, inwieweit sich die Skalierung des erdachten Systems lohnen kann und welche Ersparnisse sich daraus in Bezug auf Betrieb, Strom und Personal ergeben.
 
@@ -35,12 +35,11 @@ Die elektrischen Kenndaten wurden dem Typenschild der Pumpe entnommen, der tats�
         \hline
         \textbf{Summe} & & & & & & \textbf{14,71} \\
         \hline
+        \\
     \end{tabular}
     \caption{Elektrische Kenndaten und berechnete Wirkleistung im Ist-Zustand (Vorher-Zustand, timergesteuerter Betrieb)}
     \label{tab:LeistungIstZustand}
 \end{table}
-
-\textbf{Zu prüfen:} Strom $I_{\text{gemessen}}$ und Typenschild-Strom der SSR-Schnecke sind im Originalmessprotokoll (Ist-Aufnahme) nicht vollständig auslesbar gewesen -- bitte anhand des Originaldokuments ergänzen, sofern für die Argumentation benötigt.
 
 Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Steuerung ableiten: Der Tagesverbrauch entspricht einer Laufzeit von 4\,h/Tag im Sommerbetrieb und 12\,h/Tag im Winterbetrieb. Tabelle \ref{tab:VerbrauchIstZustand} zeigt die daraus resultierende Hochrechnung des Energieverbrauchs und der Stromkosten, die als Vergleichsbasis für die bedarfsorientierte Lösung dieser Arbeit dient.
 
@@ -56,10 +55,12 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
         Schnecke (Tag)     & 36,40 & 8,37    & 109,20 & 25,12     \\
         \textbf{Summe (Tag)}   & \textbf{58,84} & \textbf{13,53} & \textbf{176,53} & \textbf{40,60} \\
         \hline
+        \\
         Pumpe (Monat, $\approx$30\,d)     & 673,34  & 154,87    & 2020,01 & 464,60      \\
         Schnecke (Monat)   & 1092,00 & 251,16    & 3276,00 & 753,48      \\
         \textbf{Summe (Monat)} & \textbf{1765,34} & \textbf{406,03} & \textbf{5296,01} & \textbf{1218,08} \\
         \hline
+        \\
     \end{tabular}
     \caption{Verbrauchs- und Kostenprognose des Ist-Zustands nach Betriebsmodus (Strompreis 0,23 €/kWh gemäß Ist-Aufnahme)}
     \label{tab:VerbrauchIstZustand}
@@ -76,6 +77,7 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
         \textbf{Summe [kWh]}    & \textbf{42\,956,56} & \textbf{429\,565,63} \\
         \textbf{Kosten [€]}     & \textbf{9\,880,01} & \textbf{98\,800,10} \\
         \hline
+        \\
     \end{tabular}
     \caption{Jahres- und 10-Jahres-Hochrechnung des Ist-Zustands, angenommen je zur Hälfte des Jahres Sommer- bzw. Winterbetrieb}
     \label{tab:VerbrauchIstZustandJahr}
