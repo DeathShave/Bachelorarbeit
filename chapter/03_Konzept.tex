@@ -16,7 +16,36 @@ Für die Umsetzung einer Wasseroberflächenüberwachung wurden in dieser Arbeit 
 Die Berliner Wasserbetriebe tragen als Versorger des Landes Berlin und der Umgebung eine besondere Verantwortung und Sorgfaltspflicht gegenüber den Konsumenten und Nutzern. Auch die Abwasserentsorgung unterliegt dementsprechend strengen Richtlinien, die unmittelbaren Einfluss auf die Arbeitsprozesse dieser Arbeit genommen haben.
 Die Wahl eines Air-Gaps in der Hardware als höchste Sicherheitsstufe ist unmittelbar darauf zurückzuführen. Diese Entscheidung hat bereits weitreichende Auswirkungen auf unterschiedlichste Lösungsansätze genommen, etwa auf den Betrieb eines Zweitrechners zum Überspielen der Daten, die Wahl des Neuronalen Netzes in seinem Aufbau sowie die Datenerfassung selbst.
 
-\textbf{Ergänzen}: kurzes Sicherheits-/Threat-Model (welche Angreifer/Fehlerszenarien, welche Daten sind sensibel), sowie konkrete Konsequenzen für Betrieb/Updates: wie gelangen Trainingsdaten/Modelle/Logs über den Air-Gap (Medium, Prozess, Verantwortlichkeiten)?
+\textbf{Sicherheits-/Threat-Model:}
+Das Klärwerk zählt gemäß BSI-KRITIS-Verordnung als kritische Infrastruktur; die bestehende Prozessleittechnik des Nachklärbeckens (SPS-Steuerung des SSR-Antriebs, Anlagenvisualisierung) basiert wie bei den Berliner Wasserbetrieben im Anlagenbau üblich auf Siemens-SIMATIC-Technologie \index{Siemens}. Das in dieser Arbeit entwickelte System greift mit der GPIO-gesteuerten Relaisansteuerung des SSR-Antriebs (siehe Kapitel \ref{Implementierung}) unmittelbar in diese Aktorik ein und stellt damit selbst dann eine sicherheitsrelevante Komponente dar, wenn es informationstechnisch vollständig getrennt von der SPS betrieben wird -- eine Fehlfunktion des Edge-Systems (z.B. dauerhaftes Schalten oder Ausbleiben des Schaltsignals) wirkt sich direkt auf den Anlagenbetrieb aus.
+
+\textit{Angreifer- und Fehlerszenarien:}
+\begin{itemize}
+    \item \textbf{Air-Gap-Bridging über den Datenträger.} Der in Abschnitt \ref{Vorarbeit} beschriebene Transferweg (Laptop 1 $\rightarrow$ USB-Stick $\rightarrow$ Laptop 2) ist der einzige Kanal, über den Software, Modelle oder Konfigurationsdaten in die Air-Gap-Umgebung gelangen -- und damit der klassische Angriffsvektor gegen luftgekapselte Anlagensteuerungen. Das bekannteste Beispiel hierfür ist Stuxnet, das gezielt Siemens-SIMATIC-S7-Systeme über präparierte USB-Wechseldatenträger kompromittiert hat, obwohl die Zielanlagen air-gapped betrieben wurden \cite{Langner_2011}. Die in dieser Arbeit vorgesehene doppelte Virenscan-Prüfung vor der Übertragung auf Laptop 2 adressiert dieses Szenario, ersetzt aber keine Verhaltenserkennung gegen unbekannte Schadsoftware.
+    \item \textbf{Kompromittierte Softwareabhängigkeiten.} Die über das PowerShell-Skript (Anhang \ref{Anhang}) von PyPI bezogenen Python-Pakete werden auf Laptop 1 heruntergeladen, bevor sie auf das air-gapped System gelangen. Ein kompromittiertes Paket (Supply-Chain-Angriff) würde diese Prüfung ebenfalls durchlaufen müssen; eine Verifikation über Prüfsummen/Signaturen ist aktuell nicht vorgesehen.
+    \item \textbf{Physischer Zugriff auf das Edge-Gerät.} Das Gehäuse hängt frei zugänglich am Beckenrand (siehe Abbildung \ref{fig:MontageVorOrt}) und ist nicht gegen Manipulation gesichert. Ein Angreifer mit physischem Zugang könnte die SD-Karte entnehmen/austauschen, das Kameramodul verdecken oder ersetzen, oder direkt auf die GPIO-Schnittstelle zugreifen und darüber das Relais und damit den SSR-Antrieb manuell ansteuern.
+    \item \textbf{Manipulation der Trainingsdaten (Data Poisoning).} Werden Trainings- oder Annotationsdaten vor dem Modelltraining gezielt verfälscht, kann das Modell dazu gebracht werden, Schwimmschlamm systematisch als Hintergrund zu klassifizieren. Die Folge wäre ein unbemerkt ausbleibendes Schaltsignal trotz tatsächlicher Verschmutzung -- funktional gleichbedeutend mit einem Totalausfall der Erkennung, aber ohne dass dieser als Fehler auffällt.
+\end{itemize}
+
+\textit{Schutzbedarf der verarbeiteten Daten:}
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lll}
+        \hline
+        Datenart & Schutzbedarf & Begründung \\
+        \hline
+        Kamerabilder/Videostreams & gering & kein Personenbezug, Anlagenkontext sichtbar \\
+        Trainings-/Annotationsdaten & mittel & Integrität entscheidend (Data Poisoning) \\
+        Modellgewichte (\texttt{.tflite}) & mittel & Ergebnis der Trainingsarbeit, geistiges Eigentum \\
+        Logs/Betriebsprotokolle & mittel & Rückschlüsse auf Anlagenbetrieb/-zustand möglich \\
+        GPIO-/Relaiskonfiguration & hoch & direkter Hebel auf Aktorik der Anlage \\
+        \hline
+    \end{tabular}
+    \caption{Schutzbedarf der im System verarbeiteten Daten}
+    \label{tab:Schutzbedarf}
+\end{table}
+
+\textit{Konsequenzen für Betrieb und Updates:} Trainingsdaten, Modelle und Konfigurationsänderungen gelangen ausschließlich über den in Abschnitt \ref{Vorarbeit} beschriebenen manuellen, zweifach virenscangeprüften USB-Transfer in die Air-Gap-Umgebung; Logs und Testergebnisse verlassen das System auf demselben Weg in umgekehrter Richtung. Verantwortlich für die Durchführung und Dokumentation jedes Transfers ist im Rahmen dieser Arbeit der Autor selbst; im Produktivbetrieb müsste diese Aufgabe eindeutig einer Rolle bei TS-E zugeordnet werden. \textbf{Ergänzen}: konkrete Update-Häufigkeit/-Anlass sowie Freigabeprozess für den Produktivbetrieb festlegen.
 
 \textbf{Außeneinsatz:}
 Da das Bilderfassungssystem im Außeneinsatz positioniert ist, ergeben sich umfassende Anforderungen an die physische Anbindung der Peripherie, den Umgang mit Witterungsbedingungen sowie an Zuverlässigkeit und Wartungsminimierung.
