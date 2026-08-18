@@ -17,7 +17,7 @@ Die Berliner Wasserbetriebe tragen als Versorger des Landes Berlin und der Umgeb
 Die Wahl eines Air-Gaps in der Hardware als höchste Sicherheitsstufe ist unmittelbar darauf zurückzuführen. Diese Entscheidung hat bereits weitreichende Auswirkungen auf unterschiedlichste Lösungsansätze genommen, etwa auf den Betrieb eines Zweitrechners zum Überspielen der Daten, die Wahl des Neuronalen Netzes in seinem Aufbau sowie die Datenerfassung selbst.
 
 \textbf{Sicherheits-/Threat-Model:}
-Das Klärwerk zählt gemäß BSI-KRITIS-Verordnung als kritische Infrastruktur; die bestehende Prozessleittechnik des Nachklärbeckens (SPS-Steuerung des SSR-Antriebs, Anlagenvisualisierung) basiert wie bei den Berliner Wasserbetrieben im Anlagenbau üblich auf Siemens-SIMATIC-Technologie \index{Siemens}. Das in dieser Arbeit entwickelte System greift mit der GPIO-gesteuerten Relaisansteuerung des SSR-Antriebs (siehe Kapitel \ref{Implementierung}) unmittelbar in diese Aktorik ein und stellt damit selbst dann eine sicherheitsrelevante Komponente dar, wenn es informationstechnisch vollständig getrennt von der SPS betrieben wird -- eine Fehlfunktion des Edge-Systems (z.B. dauerhaftes Schalten oder Ausbleiben des Schaltsignals) wirkt sich direkt auf den Anlagenbetrieb aus.
+Das Klärwerk zählt gemäß BSI-KRITIS-Verordnung als kritische Infrastruktur; die bestehende Prozessleittechnik des Nachklärbeckens (SPS-Steuerung des SSR-Antriebs, Anlagenvisualisierung) basiert wie bei den Berliner Wasserbetrieben im Anlagenbau üblich auf Siemens-SIMATIC-Technologie \index{Siemens}. Das in dieser Arbeit entwickelte System greift mit der GPIO-gesteuerten Relaisansteuerung des SSR-Antriebs (siehe Kapitel \ref{Implementierung}) unmittelbar in diese Aktorik ein und stellt damit selbst dann eine sicherheitsrelevante Komponente dar, selbst wenn es informationstechnisch vollständig getrennt von der SPS betrieben wird -- eine Fehlfunktion des Edge-Systems (z.B. dauerhaftes Schalten oder Ausbleiben des Schaltsignals) wirkt sich direkt auf den Anlagenbetrieb aus.
 
 \textit{Angreifer- und Fehlerszenarien:}
 \begin{itemize}
@@ -40,12 +40,13 @@ Das Klärwerk zählt gemäß BSI-KRITIS-Verordnung als kritische Infrastruktur; 
         Logs/Betriebsprotokolle & mittel & Rückschlüsse auf Anlagenbetrieb/-zustand möglich \\
         GPIO-/Relaiskonfiguration & hoch & direkter Hebel auf Aktorik der Anlage \\
         \hline
+        \\
     \end{tabular}
     \caption{Schutzbedarf der im System verarbeiteten Daten}
     \label{tab:Schutzbedarf}
 \end{table}
 
-\textit{Konsequenzen für Betrieb und Updates:} Trainingsdaten, Modelle und Konfigurationsänderungen gelangen ausschließlich über den in Abschnitt \ref{Vorarbeit} beschriebenen manuellen, zweifach virenscangeprüften USB-Transfer in die Air-Gap-Umgebung; Logs und Testergebnisse verlassen das System auf demselben Weg in umgekehrter Richtung. Verantwortlich für die Durchführung und Dokumentation jedes Transfers ist im Rahmen dieser Arbeit der Autor selbst; im Produktivbetrieb müsste diese Aufgabe eindeutig einer Rolle bei TS-E zugeordnet werden. \textbf{Ergänzen}: konkrete Update-Häufigkeit/-Anlass sowie Freigabeprozess für den Produktivbetrieb festlegen.
+\textit{Konsequenzen für Betrieb und Updates:} Trainingsdaten, Modelle und Konfigurationsänderungen gelangen ausschließlich über den in Abschnitt \ref{Vorarbeit} beschriebenen manuellen, zweifach virenscangeprüften USB-Transfer in die Air-Gap-Umgebung; Logs und Testergebnisse verlassen das System auf demselben Weg in umgekehrter Richtung. Verantwortlich für die Durchführung und Dokumentation jedes Transfers ist im Rahmen dieser Arbeit der Autor selbst; im Produktivbetrieb müsste diese Aufgabe eindeutig einer Rolle bei \textbf{TS-E}\index{TS-E} zugeordnet werden. 
 
 \textbf{Außeneinsatz:}
 Da das Bilderfassungssystem im Außeneinsatz positioniert ist, ergeben sich umfassende Anforderungen an die physische Anbindung der Peripherie, den Umgang mit Witterungsbedingungen sowie an Zuverlässigkeit und Wartungsminimierung.
