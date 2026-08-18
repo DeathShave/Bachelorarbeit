@@ -13,7 +13,7 @@
 
 \section{Theoretische Grundlagen} \label{TheoretischeGrundlagen}
 
-Die Grundlagen für Faltbare Neuronale Netzwerke (CNNs) werden erläutert, wobei auch auf die zugrunde liegende Mathematik eingegangen wird. Zusätzlich erfolgt eine tabellarische Aufführung der Datensätze, der Arten von Neuronalen Netzwerken und den Verfahren zur Segmentierung zur Übersichtlichkeit.
+Die Grundlagen für Faltbare Neuronale Netzwerke (\textbf{CNNs}\index{CNN}) werden erläutert, wobei auch auf die zugrunde liegende Mathematik eingegangen wird. Zusätzlich erfolgt eine tabellarische Aufführung der Datensätze, der Arten von Neuronalen Netzwerken und den Verfahren zur Segmentierung zur Übersichtlichkeit.
 
 Um die später vorgestellten Übertragungstechniken und Kommunikationstechnologien besser einordnen zu können, wird zu Beginn auf das OSI-Modell \index{OSI-Modell}eingegangen.
 
@@ -23,10 +23,12 @@ Das sogenannte \say{Deep-Learning} stellt, wie der Name es bereits andeutet, ein
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.5\linewidth]{pictures/deep-neural-network-diagram_2x1.png}
-    \caption{}
+    \includegraphics[width=0.9\linewidth]{pictures/deep-neural-network-diagram_2x1 (2).png}
+    \caption{Funktionsweise eines neuronalen Netzwerks \cite{Downie_2024}}
     \label{fig:neural_network}
 \end{figure}
+
+\pagebreak
 
 Die unterschiedliche Funktionsweise von klassischem maschinellem Lernen und Deep-Learning lässt sich an folgendem Gedankenexperiment verdeutlichen: Liegen Daten als einzelne Punkte $(x,y)$ in einem zweidimensionalen Koordinatensystem vor, verfolgt der klassische Ansatz die Definition einer Linien- oder Kurvenfunktion, die diese Punkte möglichst gut erfasst. Der Deep-Learning-Ansatz hingegen passt sämtliche internen Linien anhand der einzelnen Punkte iterativ an, rekombiniert sie und fügt sie schließlich zu einer komplexeren Form zusammen. \cite{goodfellow_2016}
 
@@ -53,7 +55,7 @@ En- und Decoder beschreiben ein allgemeines Architekturprinzip: Ein Encoder übe
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\linewidth]{pictures/encoder-decoder-image_ibm.png}
-    \caption{Aufbau eines Transformer-Encoder-Decoders mit Self-Attention- und Feed-Forward-Schichten. \textbf{Quelle ergänzen}}
+    \caption{Aufbau eines Transformer-Encoder-Decoders mit Self-Attention- und Feed-Forward-Schichten. \cite{Noble_2024}}
     \label{fig:Encoder-Decoder}
 \end{figure}
 
@@ -72,7 +74,7 @@ Ein hoher numerischer Eingabewert $x_i$ geht dabei mit einer entsprechend hohen 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\linewidth]{pictures/De- und Encoder_hs_analysis.png}
-    \caption{CNN-Encoder mit anschließender Klassifikation über Fully-Connected- und Softmax-Schicht. \textbf{Quelle ergänzen}}
+    \caption{CNN-Encoder mit anschließender Klassifikation über Fully-Connected- und Softmax-Schicht. \cite{Wetal_2025}}
     \label{fig:DeEncoder}
 \end{figure}
 
@@ -88,7 +90,7 @@ Eine klassische bildbasierte Encoder-/Decoder-Architektur ist das U-Net. Dabei h
 
 \section{Convolutional Neural Network}
 
-Ein Convolutional Neural Network (CNN oder ConvNet), zu deutsch ein faltbares neuronales Netzwerk, ist ein speziell für die Bild- und Videoverarbeitung ausgelegtes Konzept, was in seinen Grundstrukturen 1979 von Kunihiko Fukushima mit dem \say{Neocognitron} entwickelt \cite{Fukushima_1980} und seitdem schrittweise verbessert wurde.
+Ein Convolutional Neural Network (\textbf{CNN}\index{CNN} oder \textbf{ConvNet}), zu deutsch ein faltbares neuronales Netzwerk, ist ein speziell für die Bild- und Videoverarbeitung ausgelegtes Konzept, was in seinen Grundstrukturen 1979 von Kunihiko Fukushima mit dem \say{Neocognitron} entwickelt \cite{Fukushima_1980} und seitdem schrittweise verbessert wurde.
 
 Namensgebend sind die Convolutional Layer, die auf dem Prinzip der diskreten Faltung basieren. Hierfür wird mittels eines Filterkernels die Eingabe schrittweise verarbeitet und dieses innere Produkt wird an die Neuronen weitergeleitet. Aufgrund der Mehrfachverarbeitung von überlappenden Bereichen zeichnen sich Ähnlichkeiten bei benachbarten Neuronen ab. Das Training der jeweiligen Schicht an Neuronen ist hierbei auf den Inhalt der vorherigen Schicht beschränkt, was sich durch die Ursprünge aus den biologischen rezeptiven Feldern herleitet. Dabei werden im Wesentlichen Informationen aus einem Bereich an Sinnesrezeptoren über ein Neuron verarbeitet, was Vorteile in der biologischen Datenverarbeitung bietet.
 Ein weiterer relevanter Bestandteil sind die geteilten Gewichte sämtlicher Neuronen (shared weights), die eine Grundlage für die Erkennung von Kanten, Ecken und weiteren Basisformen bietet. Auch die jeweilige Intensität in der Detektion kann angepasst werden, was vor allem bei der Kantenerkennung als Grundlage in der Bilderkennung verwendet.
@@ -96,18 +98,18 @@ Ein weiterer relevanter Bestandteil sind die geteilten Gewichte sämtlicher Neur
 \begin{figure}
     \centering
     \includegraphics[width=1\linewidth]{pictures/Typical_cnn_wikimedia.png}
-    \caption{Verarbeitung der Daten über mehrere Schichten des CNN}
+    \caption{Verarbeitung der Daten über mehrere Schichten des \textbf{CNN}\index{CNN}\cite{Aphex34_2015}}
     \label{fig:CNN_Layers}
 \end{figure}
 
-Weitergehend werden für gewöhnlich ReLUs und Backpropagation für die Konvertierung des Inputs zum Output verwendet.
+Weitergehend werden für gewöhnlich \textbf{ReLUs} und Backpropagation für die Konvertierung des Inputs zum Output verwendet.
 
 \begin{equation}
      f(x)=\left\{\begin{array}{ll} x & x \geq 0 \\
          0, & sonst\end{array}\right. .
 \end{equation}
 
-Eine Rectified Linear Unit (ReLU) entspricht einer Aktivierungsfunktion, deren negative Eingabewerte auf null gesetzt werden, während positive Werte unverändert bleiben ($f(x) = max(0, x)$).
+Eine Rectified Linear Unit (\textbf{ReLU}\index{ReLU}) entspricht einer Aktivierungsfunktion, deren negative Eingabewerte auf null gesetzt werden, während positive Werte unverändert bleiben ($f(x) = max(0, x)$).
 
 Die Anpassung der Gewichte $w_{ij}$ erfolgt anschließend über Backpropagation, die den Gradienten der Verlustfunktion rückwärts durch das Netz propagiert:
 
@@ -121,7 +123,7 @@ Mittels der Faltungsmatrix wird die regulär eine zwei- bis dreidimensionale Mat
 
 \section{MobileNetV3}
 
-MobileNet ist ein leichtes Convolutional Neural Network (CNN) von \textcite{Howard_2017}, das für den Einsatz auf mobilen Endgeräten entworfen wurde und entsprechend geringere Anforderungen im Vergleich zu ähnlichen Modellen aufweist. Ein Kernelement sind die depthwise separable convolutions. Diese ersetzen die konventionellen Convolutional Layer durch ein zweischichtiges System. Einerseits werden räumliche Tiefeninformationen grob und leichtgewichtig bearbeitet sowie zugleich konserviert, während im zweiten Layer eine aufwändigere punktweise 1x1 Faltung vorgenommen wird, die der Generierung von Eigenschaften gilt. Durch diese Trennung sinkt die Anzahl an Parameter und mathematische Operationen, während die Aussagekraft hoch bleibt.
+MobileNet ist ein leichtes Convolutional Neural Network (\textbf{CNN}\index{CNN}) von \textcite{Howard_2017}, das für den Einsatz auf mobilen Endgeräten entworfen wurde und entsprechend geringere Anforderungen im Vergleich zu ähnlichen Modellen aufweist. Ein Kernelement sind die depthwise separable convolutions. Diese ersetzen die konventionellen Convolutional Layer durch ein zweischichtiges System. Einerseits werden räumliche Tiefeninformationen grob und leichtgewichtig bearbeitet sowie zugleich konserviert, während im zweiten Layer eine aufwändigere punktweise 1x1 Faltung vorgenommen wird, die der Generierung von Eigenschaften gilt. Durch diese Trennung sinkt die Anzahl an Parameter und mathematische Operationen, während die Aussagekraft hoch bleibt.
 
 Verbessert wurde dieses Grundmodell mit \textcite{Sandler_2018} zu MobileNetV2, bei dem inverted residuals und linear bottlenecks eingeführt wurden. Bei invertierten Residuen handelt es sich um eine Möglichkeit des Netzwerks, Aktivierungen früher zu erreichen. Indem eine Verbindung zwischen Anfang und Ende eines Convolutional Blockes geschaffen wird, können Hochskalierungen übersprungen und damit Parameter eingespart werden, was sich für das Training von tiefen Netzen als äußerst effizient herausgestellt hat.
 Andererseits werden hierdurch Leistungseinbußen verursacht, die an anderer Stelle korrigiert werden mit linearen Flaschenhälsen. Dafür werden 1x1 Layer zwischen den restlichen Schichten in die building blocks für In- und Output eingebaut, die die Eingabe auf das Format reduzieren und somit harmonisieren. Die Blöcke der layer transformation bestehen weiterhin aus einer nicht linearen Funktion, was die Vorteile beider Varianten bedeutet.
@@ -133,7 +135,7 @@ Andererseits werden hierdurch Leistungseinbußen verursacht, die an anderer Stel
     \label{fig:convolutions}
 \end{figure}
 
-Im Rahmen von MobileNetV3 \cite{Howard_2019} wurden die bestehenden ReLUs durch swish nonlinearity Funktionen ersetzt, die eine Kombination aus einfacher und harter Sigmoid-Funktion darstellt:
+Im Rahmen von MobileNetV3 \cite{Howard_2019} wurden die bestehenden \textbf{ReLUs} \index{ReLU} durch swish nonlinearity Funktionen ersetzt, die eine Kombination aus einfacher und harter Sigmoid-Funktion darstellt:
 
 \begin{equation}
      f(x)=\frac{1}{1+e^{-x}}
@@ -141,12 +143,12 @@ Im Rahmen von MobileNetV3 \cite{Howard_2019} wurden die bestehenden ReLUs durch 
 
 Die Sigmoid-Funktion staucht ihren Eingabewert auf ein Intervall zwischen 0 und 1, was für die \say{harte} (stückweise lineare, recheneffizientere) Approximation innerhalb der swish-Aktivierung von MobileNetV3 genutzt wird.
 
-Darüber hinaus wurde die Plattformerkennung mittels NAS optimiert, ein Netzwerk-Feintuning durch NetAdapt und Squeeze-and-Excite (SE) Module hinzugefügt.
+Darüber hinaus wurde die Plattformerkennung mittels \textbf{NAS}\index{NAS} optimiert, ein Netzwerk-Feintuning durch NetAdapt und Squeeze-and-Excite (\textbf{SE}\index{SE}) Module hinzugefügt.
 
 
 
 \section{Zusammenfassung/Bewertung}
-Aufgrund der vielseitigen Anforderungen an das Projekt hinsichtlich der Umgebung, Sicherheitsanforderungen und Zeitrahmens stellt ein auf Raspberry Pi 5 basierendes System mit MobileNetV3 unter TF-Lite Runtime die beste Alternative dar. Hiermit gestaltet sich der hochwertigste Trade-Off zwischen Perfomanz, Simplizität und Kosten. Das zugrunde liegende CNN in Kombination mit Semantischer Segmentierung ist zwar eine aufwändigere Form durch die notwendige Pixelannotation, bietet aber Vorteile durch simple Grenzwertbestimmung, die für das Schaltverhalten der Peripherie sinnvoll ist. Der Raspberry stellt durch die Vielfalt an Online-Anleitungen und direkte physische Anbindung per GPIO-Pins den optimalen Kompromiss aus DIY- und Industrielösung dar, ohne einen Mikrocontroller zu benötigen.
+Aufgrund der vielseitigen Anforderungen an das Projekt hinsichtlich der Umgebung, Sicherheitsanforderungen und Zeitrahmens stellt ein auf Raspberry Pi 5 basierendes System mit MobileNetV3 unter TF-Lite Runtime die beste Alternative dar. Hiermit gestaltet sich der hochwertigste Trade-Off zwischen Perfomanz, Simplizität und Kosten. Das zugrunde liegende \textbf{CNN}\index{CNN} in Kombination mit Semantischer Segmentierung ist zwar eine aufwändigere Form durch die notwendige Pixelannotation, bietet aber Vorteile durch simple Grenzwertbestimmung, die für das Schaltverhalten der Peripherie sinnvoll ist. Der Raspberry stellt durch die Vielfalt an Online-Anleitungen und direkte physische Anbindung per \textbf{GPIO}-Pins \index{GPIO} den optimalen Kompromiss aus DIY- und Industrielösung dar, ohne einen Mikrocontroller zu benötigen.
 
 
 \ldots

@@ -14,21 +14,21 @@ Die Implementierung nutzt ein einzelnes wetterfestes Gehäuse, das am äußeren 
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.6\linewidth]{pictures/Montage/image5.jpeg}
+    \includegraphics[width=0.6\linewidth]{pictures/Montage2/IMG_0045.jpg}
     \caption{Gehäusedeckel mit montiertem Kameramodul (Flachbandkabel-Anschluss)}
     \label{fig:KameraGehaeuseOffen}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.6\linewidth]{pictures/Montage/image9.jpeg}
+    \includegraphics[width=0.6\linewidth]{pictures/Montage2/IMG_0041.jpg}
     \caption{Gehäuseboden mit Raspberry Pi 5 als Recheneinheit (aktiver Kühlkörper/Lüfter, USB- und Ethernet-Anschlüsse sichtbar)}
     \label{fig:PiGehaeuseOffen}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.4\linewidth]{pictures/Montage/image3.jpeg}
+    \includegraphics[width=0.4\linewidth]{pictures/Montage2/IMG_0047.jpg}
     \caption{Geschlossenes Gehäuse mit Kabeldurchführung; wetterfeste Ausführung für den Außeneinsatz}
     \label{fig:GehaeuseGeschlossen}
 \end{figure}
@@ -37,7 +37,7 @@ Bei dem Gehäuse handelt es sich um einen Feuchtraum-Abzweigkasten (Schutzart IP
 
 Die Stromversorgung des Raspberry Pi erfolgt über das originale 27\,W-USB-C-Netzteil des Raspberry Pi 5, das über ein Verlängerungskabel bis zu einem separaten, ebenfalls wetterfesten Feuchtraum-Verteilerkasten geführt wird, der die eigentliche Netzanbindung vor Ort herstellt (siehe Verteilerkasten am Beckenrand in Abbildung \ref{fig:MontageVorOrt}).
 
-Die GPIO-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code (\texttt{app.py}) hinterlegt (Tabelle \ref{tab:GPIOBelegung}); sie betrifft ausschließlich die Relaissteuerung des SSR-Antriebs. Die Kamera selbst wird nicht über GPIO, sondern über die CSI-Schnittstelle angebunden und ist davon unabhängig.
+Die \textbf{GPIO}\index{GPIO}-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code (\texttt{app.py}) hinterlegt (Tabelle \ref{tab:GPIOBelegung}); sie betrifft ausschließlich die Relaissteuerung des \textbf{SSR}\index{SSR}-Antriebs. Die Kamera selbst wird nicht über \textbf{GPIO}\index{GPIO}, sondern über die \textbf{CSI}\index{CSI}-Schnittstelle angebunden und ist davon unabhängig.
 
 \begin{table}[h]
     \centering
@@ -50,8 +50,9 @@ Die GPIO-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code 
         R3 & 22 \\
         R4 & 23 \\
         \hline
+        \\
     \end{tabular}
-    \caption{GPIO-Pinbelegung der Relaisansteuerung gemäß \texttt{app.py} (\texttt{RELAY\_PINS})}
+    \caption{\textbf{GPIO}\index{GPIO}-Pinbelegung der Relaisansteuerung gemäß \texttt{app.py} (\texttt{RELAY\_PINS})}
     \label{tab:GPIOBelegung}
 \end{table}
 
@@ -63,18 +64,19 @@ DARSTELLUNG SCHALTUNG
 
 \section{Montage/Vorrichtung}
 
-Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung TS-E/M/Was, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus Aluminium dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser "Arm" über ein Gelenk, was auch bei eingebauter Vorrichtung die Anpassung des Neigungswinkels ändert und somit indirekt den Kamerawinkel modifiziert. Das ist für Testzwecke notwendig um den Winkel mit der geringsten Spiegelung für das Kameramodul zu ermitteln. \\ \\
+Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung \textbf{TS-E/M/Was}\index{TS-E/M/Was}, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus Aluminium dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser
+\say{Arm} über ein Gelenk, was auch bei eingebauter Vorrichtung die Anpassung des Neigungswinkels ändert und somit indirekt den Kamerawinkel modifiziert. Das ist für Testzwecke notwendig um den Winkel mit der geringsten Spiegelung für das Kameramodul zu ermitteln. \\ \\
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
-    \includegraphics[width=0.65\linewidth]{pictures/Montage/image6.jpeg}
+    \includegraphics[width=0.65\linewidth]{pictures/Montage2/IMG_0044.jpg}
     \caption{Aufhängearm aus Aluminium-Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (Bildmitte) und Einhak-Fassung für die Beckenreeling (rechts); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
     \label{fig:ArmDraufsicht}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.35\linewidth]{pictures/Montage/image7.jpeg}
+    \includegraphics[width=0.35\linewidth]{pictures/Montage2/IMG_0043.jpg}
     \caption{Seitenansicht des montierten Arms mit Kameragehäuse unterhalb des Wetterschutzblechs und Gelenk zur Neigungswinkelverstellung}
     \label{fig:ArmSeite}
 \end{figure}
@@ -85,7 +87,7 @@ Am fertig installierten System zeigt sich die Positionierung des Kameragehäuses
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\linewidth]{pictures/Montage/image1.jpeg}
+    \includegraphics[width=0.8\linewidth]{pictures/Montage2/IMG_0049.jpg}
     \caption{Installierter Aufhängearm am Nachklärbecken (Klärwerk Waßmannsdorf), Kameragehäuse über der Wasseroberfläche positioniert}
     \label{fig:MontageVorOrt}
 \end{figure}
