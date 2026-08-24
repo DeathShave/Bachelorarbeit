@@ -97,4 +97,22 @@ Als weiterer Anhaltspunkt dient ein Protokoll über den zuverlässigen Betrieb d
 
 
 \section{Bewertung der Ergebnisse}
+
+\subsection{Stabilität im Außenbetrieb}
+
+Zum 07. September 2026 ist der Prototyp bereits über einen Monat (29. Juli 2026) im Betrieb und es gab keine Abstürze.
+Dabei herrschten Temperaturen über 30 Grad und Regenereignisse, die nichts an der Funktionalität geändert haben.
+Im Rahmen des minimalistischen Aufbaus ist das als Erfolg zu verbuchen. Aufgrund der Vibration schwingt der Kameraarm leicht, was sich durch die angepasste Belichtungszeit aber nicht übermäßig auf die Bildqualität auswirkt. 
+
+\subsection{Training des Neuronalen Netzes}
+
+Wie bereits erwähnt, variieren Farben und Formen des Schwimmschlamms stark in Abhängigkeit von Temperatur und Sonnenlicht. Darum ist die einheitliche Annotation insbesondere im Sommer äußerst schwierig, wenn sich primär Plastikpartikel auf der Oberfläche abzeichnen. Diese sind zwar auch zu reinigende Bestandteile, aber unterscheiden sich kaum von der Wasseroberfläche. Vor allem mit dem Auftreten von Spiegelungen lässt sich kein Automatisierungsansatz, wie mit einer Bitmaske, durchführen. \\
+
+Ein alternative Ansatz besteht in dem Trainieren eines kleinen Netzes mittels 15 Bilder, die von Hand klassifiziert werden und das autonom den restlichen Datensatz iterativ einordnet. Anschließend wird nachjustiert, da die Vorhersagen nicht perfekt sind. \\
+
+Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder des Datensatzes weiterverarbeitet werden. 
+
+\subsection{Qualität der Bilderkennung}
+
 \ldots
+
