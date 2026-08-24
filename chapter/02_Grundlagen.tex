@@ -15,7 +15,7 @@ Die Grundlagen für Faltbare Neuronale Netzwerke (\textbf{CNNs}\index{CNN}) werd
 %Um die später vorgestellten Übertragungstechniken und Kommunikationstechnologien besser einordnen zu können, wird zu Beginn auf das OSI-Modell \index{OSI-Modell}eingegangen.
 \subsection{Neuronale Netze - Deep Learning}
 
-Das sogenannte \say{Deep-Learning} stellt, wie der Name es bereits andeutet, eine vertiefende Variante des maschinellen Lernens dar. Während bei klassischen Lernverfahren noch Algorithmen mit explizit definierten Operationen und mathematischer Logik zum Einsatz kommen, passt die Tiefenlern-Methode die Verknüpfungsstärke (Gewichte und Verzerrungen) des Modells datengetrieben an. Neuronale Netze und \say{Deep Learning} werden zwar oft synonym verwendet, sind aber nicht vollständig deckungsgleich: Per Definition liegt Deep Learning erst ab vier Schichten vor, wobei moderne neuronale Netze diese Tiefe deutlich überschreiten. \cite{goodfellow_2016}
+Das sogenannte \say{Deep-Learning} stellt, wie der Name es bereits andeutet, eine vertiefende Variante des maschinellen Lernens dar. Während bei klassischen Lernverfahren noch Algorithmen mit explizit definierten Operationen und mathematischer Logik zum Einsatz kommen, passt die Tiefenlern-Methode die Verknüpfungsstärke (Gewichte und Verzerrungen) des Modells datengetrieben an. Neuronale Netze und \say{Deep Learning} werden zwar oft synonym verwendet, sind aber nicht vollständig deckungsgleich: Per Definition liegt Deep Learning erst ab vier Schichten vor, wobei moderne neuronale Netze diese Tiefe deutlich überschreiten. \cite{goodfellow_2016, Bergmann_2025}
 
 
 \begin{figure}[H]
@@ -36,13 +36,13 @@ Aufgrund dieser hohen Flexibilität werden neuronale Netze auch als \say{univers
 
 \subsection{Semantische Segmentierung}
 
-Die Semantische Segmentierung ist ein Konzept der Computer Vision, bei dem das erfasste Bild in mehrere Labels unterteilt wird. Nebeneinander liegende Pixel werden anhand von Alleinstellungsmerkmalen zusammengefasst. Dieses Verfahren unterscheidet sich durch die strikte Aufteilung in allgemeine Schichten, während einzelne Objekte im Gegensatz zur Instanzsegmentierung oder panoptischen Segmentierung keine Rolle spielen. Abbildung \ref{fig:Beispiel Segmentierung} stellt diese Abgrenzung den verwandten Verfahren Instanzsegmentierung und panoptischer Segmentierung visuell gegenüber. \cite{goodfellow_2016}
+Die Semantische Segmentierung ist ein Konzept der Computer Vision, bei dem das erfasste Bild in mehrere Labels unterteilt wird. Nebeneinander liegende Pixel werden anhand von Alleinstellungsmerkmalen zusammengefasst. Dieses Verfahren unterscheidet sich durch die strikte Aufteilung in allgemeine Schichten, während einzelne Objekte im Gegensatz zur Instanzsegmentierung \cite{He_2017_ICCV} oder panoptischen Segmentierung keine Rolle spielen. Abbildung \ref{fig:Beispiel Segmentierung} stellt diese Abgrenzung den verwandten Verfahren Instanzsegmentierung und panoptischer Segmentierung visuell gegenüber. \cite{goodfellow_2016}
 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\linewidth]{pictures/types_of_segmentation.jpg}
     \caption{Darstellung
-    der Segmentierungsoptionen \cite{Naminas}}
+    der Segmentierungsoptionen \cite{Naminas_2026}}
     \label{fig:Beispiel Segmentierung}
 \end{figure}
 
