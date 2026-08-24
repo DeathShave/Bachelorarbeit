@@ -9,23 +9,23 @@
 
 \chapter{Grundlagen} \label{Grundlagen}
 
-
-
 \section{Theoretische Grundlagen} \label{TheoretischeGrundlagen}
 
 Die Grundlagen für Faltbare Neuronale Netzwerke (\textbf{CNNs}\index{CNN}) werden erläutert, wobei auch auf die zugrunde liegende Mathematik eingegangen wird. Zusätzlich erfolgt eine tabellarische Aufführung der Datensätze, der Arten von Neuronalen Netzwerken und den Verfahren zur Segmentierung zur Übersichtlichkeit.
-
-Um die später vorgestellten Übertragungstechniken und Kommunikationstechnologien besser einordnen zu können, wird zu Beginn auf das OSI-Modell \index{OSI-Modell}eingegangen.
-
+%Um die später vorgestellten Übertragungstechniken und Kommunikationstechnologien besser einordnen zu können, wird zu Beginn auf das OSI-Modell \index{OSI-Modell}eingegangen.
 \subsection{Neuronale Netze - Deep Learning}
 
-Das sogenannte \say{Deep-Learning} stellt, wie der Name es bereits andeutet, eine vertiefende Variante des maschinellen Lernens dar. Während bei klassischen Lernverfahren noch Algorithmen mit explizit definierten Operationen und mathematischer Logik zum Einsatz kommen, passt die Tiefenlern-Methode die Verknüpfungsstärke (Gewichte und Verzerrungen) des Modells datengetrieben an. Neuronale Netze und \say{Deep Learning} werden zwar oft synonym verwendet, sind aber nicht vollständig deckungsgleich: Per Definition liegt Deep Learning erst ab vier Schichten vor, wobei moderne neuronale Netze diese Tiefe deutlich überschreiten. \cite{goodfellow_2016} \\ \\
+Das sogenannte \say{Deep-Learning} stellt, wie der Name es bereits andeutet, eine vertiefende Variante des maschinellen Lernens dar. Während bei klassischen Lernverfahren noch Algorithmen mit explizit definierten Operationen und mathematischer Logik zum Einsatz kommen, passt die Tiefenlern-Methode die Verknüpfungsstärke (Gewichte und Verzerrungen) des Modells datengetrieben an. Neuronale Netze und \say{Deep Learning} werden zwar oft synonym verwendet, sind aber nicht vollständig deckungsgleich: Per Definition liegt Deep Learning erst ab vier Schichten vor, wobei moderne neuronale Netze diese Tiefe deutlich überschreiten. \cite{goodfellow_2016}
 
-\begin{figure}
-    \centering
+
+\begin{figure}[H]
+    
+    \centering{
+    
+
     \includegraphics[width=0.9\linewidth]{pictures/deep-neural-network-diagram_2x1 (2).png}
     \caption{Funktionsweise eines neuronalen Netzwerks \cite{Downie_2024}}
-    \label{fig:neural_network}
+    \label{fig:neural_network}}
 \end{figure}
 
 \pagebreak
@@ -126,7 +126,7 @@ Mittels der Faltungsmatrix wird die regulär eine zwei- bis dreidimensionale Mat
 MobileNet ist ein leichtes Convolutional Neural Network (\textbf{CNN}\index{CNN}) von \textcite{Howard_2017}, das für den Einsatz auf mobilen Endgeräten entworfen wurde und entsprechend geringere Anforderungen im Vergleich zu ähnlichen Modellen aufweist. Ein Kernelement sind die depthwise separable convolutions. Diese ersetzen die konventionellen Convolutional Layer durch ein zweischichtiges System. Einerseits werden räumliche Tiefeninformationen grob und leichtgewichtig bearbeitet sowie zugleich konserviert, während im zweiten Layer eine aufwändigere punktweise 1x1 Faltung vorgenommen wird, die der Generierung von Eigenschaften gilt. Durch diese Trennung sinkt die Anzahl an Parameter und mathematische Operationen, während die Aussagekraft hoch bleibt.
 
 Verbessert wurde dieses Grundmodell mit \textcite{Sandler_2018} zu MobileNetV2, bei dem inverted residuals und linear bottlenecks eingeführt wurden. Bei invertierten Residuen handelt es sich um eine Möglichkeit des Netzwerks, Aktivierungen früher zu erreichen. Indem eine Verbindung zwischen Anfang und Ende eines Convolutional Blockes geschaffen wird, können Hochskalierungen übersprungen und damit Parameter eingespart werden, was sich für das Training von tiefen Netzen als äußerst effizient herausgestellt hat.
-Andererseits werden hierdurch Leistungseinbußen verursacht, die an anderer Stelle korrigiert werden mit linearen Flaschenhälsen. Dafür werden 1x1 Layer zwischen den restlichen Schichten in die building blocks für In- und Output eingebaut, die die Eingabe auf das Format reduzieren und somit harmonisieren. Die Blöcke der layer transformation bestehen weiterhin aus einer nicht linearen Funktion, was die Vorteile beider Varianten bedeutet.
+Andererseits werden hierdurch Leistungseinbußen verursacht, die an anderer Stellemit linearen Flaschenhälsen korrigiert werden . Dafür werden 1x1 Layer zwischen den restlichen Schichten in die building blocks für In- und Output eingebaut, die die Eingabe auf das Format reduzieren und somit harmonisieren. Die Blöcke der layer transformation bestehen weiterhin aus einer nicht linearen Funktion, was die Vorteile beider Varianten bedeutet.
 
 \begin{figure}[h]
     \centering

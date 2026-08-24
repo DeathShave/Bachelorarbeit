@@ -52,47 +52,61 @@ Die \textbf{GPIO}\index{GPIO}-Pinbelegung für die Relais-/Aktorikansteuerung is
         \hline
         \\
     \end{tabular}
-    \caption{\textbf{GPIO}\index{GPIO}-Pinbelegung der Relaisansteuerung gemäß \texttt{app.py} (\texttt{RELAY\_PINS})}
+    \caption{GPIO-Pinbelegung der Relaisansteuerung gemäß \texttt{app.py} (\texttt{RELAY\_PINS})}
     \label{tab:GPIOBelegung}
 \end{table}
+
+\begin{comment}
+    
+
 
 \textbf{Ergänzen}: Länge des internen CSI-Flachbandkabels zwischen Deckel (Kamera) und Boden (Pi) angeben; Belegung/Typ des Relaismoduls (wie viele Kanäle, welcher SSR-Anschluss an welches Relais) sowie Schaltplan/Blockschaltbild (Kamera $\rightarrow$ Raspberry Pi $\rightarrow$ GPIO/Relais $\rightarrow$ SSR-Antrieb) als Abbildung ergänzen.
 
 DARSTELLUNG SCHALTUNG
 
+\end{comment}
+
 \section{Montage/Vorrichtung}
 
-Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung \textbf{TS-E/M/Was}\index{TS-E/M/Was}, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus Aluminium dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser
+Im Anwendungsbereich eines Klärwerks ist im Rahmen der kritischen Infrastruktur eine konkrete Planung der benötigten Vorrichtung notwendig, was entsprechend in Absprache mit der Abteilung \textbf{TS-E/M/Was}\index{TS-E/M/Was}, deren Spezialisierung in der Montage besteht. Hierfür wurde eine Profilschiene aus rostfreiem Edelstahl dahingehend umgebaut, dass eine Fassung für die Reeling des Nachklärbeckens geschaffen wurde, über die sie eingehakt werden kann. Zusätzlich verfügt dieser
 \say{Arm} über ein Gelenk, was auch bei eingebauter Vorrichtung die Anpassung des Neigungswinkels ändert und somit indirekt den Kamerawinkel modifiziert. Das ist für Testzwecke notwendig um den Winkel mit der geringsten Spiegelung für das Kameramodul zu ermitteln. \\ \\
 
-\begin{figure}[ht]
+\begin{comment}
+    
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.65\linewidth]{pictures/Montage2/IMG_0044.jpg}
-    \caption{Aufhängearm aus Aluminium-Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (links) und Einhak-Fassung für die Beckenreeling (Bildmitte); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
+    \caption{Aufhängearm aus Profilschiene: verstellbares Gelenk zur Neigungswinkeländerung (links) und Einhak-Fassung für die Beckenreeling (Bildmitte); der Blech-Wetterschutz für das Kameragehäuse befindet sich am linken Ende}
     \label{fig:ArmDraufsicht}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.35\linewidth]{pictures/Montage2/IMG_0043.jpg}
     \caption{Seitenansicht des montierten Arms mit Kameragehäuse unterhalb des Wetterschutzblechs und Gelenk zur Neigungswinkelverstellung}
     \label{fig:ArmSeite}
 \end{figure}
 
-\textbf{Technische Zeichnung}/Maßangaben ergänzen (Länge des Arms, Abmessungen des Wetterschutzblechs, Material-/Legierungsbezeichnung der Profilschiene, Neigungswinkelbereich des Gelenks in Grad).
+
+
+\textbf{Technische Zeichnung}/Maßangaben ergänzen (Länge des Arms, Abmessungen des Wetterschutzblechs, Material-/Legierungsbezeichnung der Profilschiene, Neigungswinkelbereich des Gelenks in Grad)?
+
+\end{comment}
+
 
 Am fertig installierten System zeigt sich die Positionierung des Kameragehäuses über der Wasseroberfläche des Nachklärbeckens:
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{pictures/Montage2/IMG_0049.jpg}
     \caption{Installierter Aufhängearm am Nachklärbecken (Klärwerk Waßmannsdorf), Kameragehäuse über der Wasseroberfläche positioniert}
     \label{fig:MontageVorOrt}
 \end{figure}
 
-Witterungsschutz: Das Gehäuse ist als IP65-Feuchtraum-Abzweigkasten wetterfest ausgeführt (siehe Abbildung \ref{fig:GehaeuseGeschlossen} sowie Abschnitt \ref{Implementierung}) und zusätzlich durch das angewinkelte Blech über dem Deckel vor direkter Sonneneinstrahlung und Niederschlag geschützt, was zugleich zur Reduktion von Lichtreflexionen auf der Wasseroberfläche beiträgt. Die Stromversorgung erfolgt über das USB-C-Netzteil des Raspberry Pi mit Verlängerung bis zum Feuchtraum-Verteilerkasten am Beckenrand (siehe Abbildung \ref{fig:MontageVorOrt}).
+Witterungsschutz: Das Gehäuse ist als IP65-Feuchtraum-Abzweigkasten wetterfest ausgeführt, wobei durch die Umbaumaßnahmen der Schutz teilweise verloren gegangen ist (siehe Abbildung \ref{fig:GehaeuseGeschlossen} sowie Abschnitt \ref{Implementierung}). Darüber hinaus ist es zusätzlich durch das angewinkelte Blech über dem Deckel vor direkter Sonneneinstrahlung und Niederschlag geschützt, was zugleich minimal zur Reduktion von Lichtreflexionen auf der Wasseroberfläche beiträgt. Die Stromversorgung erfolgt über das USB-C-Netzteil des Raspberry Pi mit Verlängerung bis zum Feuchtraum-Verteilerkasten am Beckenrand (siehe Abbildung \ref{fig:MontageVorOrt}).
 \\ \\
 
-Die Führung des 1,2 M langen Kabels wurde mit mehreren Kabelbindern realisiert. Hierbei wurde etwas Spielraum gelassen, damit der Arm für Wartungsarbeiten am verstellbaren Gelenk umgeklappt werden kann. So ist für die Wartung kein zusätzlicher Aufwand nötig.
+Die Führung des 1,2 m langen Kabels wurde mit mehreren Kabelbindern realisiert. Hierbei wurde etwas Spielraum gelassen, damit der Arm für Wartungsarbeiten am verstellbaren Gelenk umgeklappt werden kann. So ist für die Wartung kein zusätzlicher Aufwand nötig.
 
 Aufgrund der Länge des Kabels wurde ein Verlängerungskabel verbunden, das für den Außeneinsatz gedacht und mit der Reling per separatem Kabelschaft verschraubt ist. 

@@ -20,7 +20,11 @@ Ein weiterer Primärstandort war das Klärwerk Waßmannsdorf, in dem ebenfalls e
 
 \subsection{Recherche und Themenfindung}
 
-\textbf{Ergänzen}: Ablauf der Recherche- und Themenfindungsphase (Ausgangsfragestellung, betrachtete Alternativen, warum die Wahl auf semantische Segmentierung/Air-Gap-Edge-Computing fiel).
+Im Rahmen der Vorarbeit zum Projekt fand eine intensive Recherchephase statt, um sich in das Thema angemessen einlesen zu können. Die Ausgangsfragestellung war hierbei. "Wie lässt sich ein Prototyp entwickeln, der simpel programmier- und konfigurierbar ist, während die Option gleichzeitig den Anforderungen einer minimalistischen Industrielösung in entsprechendem Umfeld gerecht wird?"
+Hierbei wurden Alternativen wie klassische Objekterkennung gegenüber der pixelbasierten semantischen Segmentierung betrachtet, die aber in Anbetracht der unterschiedlichen Formen und des Auftreten von Schwimmschlamm keine ausreichende Erkennungswahrscheinlichkeit versprachen. \\
+
+Auch klassische Industrielösungen wie Edge-Ai Kameras standen grundsätzlich zur Auswahl, wurden aus Kostengründen und Sicherheitsbedenken aber wieder verworfen. 
+
 
 \subsection{Planung und Umsetzung}
 
@@ -82,7 +86,7 @@ pip install <paket> --no-index --find-links .
 
 \section{Produktwahl}
 
-\begin{table}[]
+\begin{table}[H]
     \centering
     \begin{tabular}{|l|l|}
     \hline
@@ -99,7 +103,9 @@ pip install <paket> --no-index --find-links .
     \textit{\textbf{Power Efficiency}}                           & Average power consumption, optimized for long-term use   \\ \hline
     \textit{\textbf{GPIO Ports}}                                 & 40 programmable GPIO pins                                \\ \hline
     \textit{\textbf{Size \& Design}}                             & Standard design with size of 88x58mm                     \\ \hline
-    \textit{\textbf{Price (Estimated)}}                          & Approximate price of 180€ for the advanced model             \\ \hline                              
+    \textit{\textbf{Price (Estimated)}}                          & Approximate price of 180€ for the advanced model             \\ 
+    \hline
+
     \end{tabular}
     \caption{Übersicht der Eigenschaften eines Raspberry Pi 5}
     \label{tab:Eigenschaftstabelle}
