@@ -23,7 +23,9 @@ Als Aufnahme des Ist-Zustands wurde der Durchflussstrom mittels einer Strommessz
 
 Dieser prototypische Test soll Aussagekraft darüber liefern, inwieweit sich die Skalierung des erdachten Systems lohnen kann und welche Ersparnisse sich daraus in Bezug auf Betrieb, Strom und Personal ergeben.
 
-Die elektrischen Kenndaten wurden dem Typenschild der Pumpe entnommen, der tatsächlich fließende Strom wurde mit einer Strommesszange gemessen. Die Wirkleistung ergibt sich für den dreiphasigen Anschluss (400\,V) nach $P=\sqrt{3}\cdot U \cdot I \cdot \cos\varphi$ aus dem \emph{gemessenen} Strom, nicht aus dem Typenschild-Nennstrom -- für die Pumpe bestätigt sich der Wert damit rechnerisch: $\sqrt{3}\cdot400\,\text{V}\cdot9,1\,\text{A}\cdot0,89 \approx 5,61\,\text{kW}$.
+Die elektrischen Kenndaten wurden dem Typenschild der Pumpe entnommen, der tatsächlich fließende Strom wurde mit einer Strommesszange gemessen. Die Wirkleistung ergibt sich für den dreiphasigen Anschluss (400\,V) nach $P=\sqrt{3}\cdot U \cdot I \cdot \cos\varphi$ aus dem \emph{gemessenen} Strom, nicht aus dem Typenschild-Nennstrom -- für die Pumpe bestätigt sich der Wert damit rechnerisch: $\sqrt{3}\cdot400\,\text{V}\cdot3,1\,\text{A}\cdot0,89 \approx 1,91\,\text{kW}$.
+
+Für die SSR-Schnecke ist mit $0,18\,\text{kW}$ nur die Nennleistung laut Typenschild bekannt. Unter der Annahme desselben Anschlusses (400\,V, 50\,Hz, $\cos\varphi=0,57$) ergibt sich daraus rechnerisch ein Typenschild-Strom von $I=\frac{P}{\sqrt{3}\cdot U\cdot\cos\varphi}\approx 0,46\,\text{A}$ -- ein für einen kleinen dreiphasigen Getriebemotor dieser Leistungsklasse plausibler Wert. Sowohl die angenommene Spannung von 400\,V als auch die Netzfrequenz von 50\,Hz bestätigen sich damit für beide Komponenten.
 
 \begin{table}[h]
     \centering
@@ -31,10 +33,10 @@ Die elektrischen Kenndaten wurden dem Typenschild der Pumpe entnommen, der tats�
         \hline
         Komponente & $f$ [Hz] & $U$ [V] & $I_{\text{Typenschild}}$ [A] & $\cos\varphi$ & $I_{\text{gemessen}}$ [A] & $P$ [kW] \\
         \hline
-        Pumpe        & 50 & 400 & 4,8 & 0,89 & 9,1 & 5,61 \\
-        SSR-Schnecke & 50 & 400 & \textit{s. Messprot.} & 0,57 & \textit{s. Messprot.} & 9,10 \\
+        Pumpe        & 50 & 400 & 4,8 & 0,89 & 3,1 & 1,91 \\
+        SSR-Schnecke & 50 & 400 & \textit{s. Messprot.} & 0,57 & \textit{s. Messprot.} & 0,18 \\
         \hline
-        \textbf{Summe} & & & & & & \textbf{14,71} \\
+        \textbf{Summe} & & & & & & \textbf{2,09} \\
         \hline
         \\
     \end{tabular}
@@ -52,14 +54,14 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
         & \multicolumn{2}{c}{Sommerbetrieb (4\,h/Tag)} & \multicolumn{2}{c}{Winterbetrieb (12\,h/Tag)} \\
         & Verbrauch [kWh] & Kosten [€] & Verbrauch [kWh] & Kosten [€] \\
         \hline
-        Pumpe (Tag)        & 22,44 & 5,16    & 67,33  & 15,49     \\
-        Schnecke (Tag)     & 36,40 & 8,37    & 109,20 & 25,12     \\
-        \textbf{Summe (Tag)}   & \textbf{58,84} & \textbf{13,53} & \textbf{176,53} & \textbf{40,60} \\
+        Pumpe (Tag)        & 7,65 & 1,76    & 22,94  & 5,28     \\
+        Schnecke (Tag)     & 0,72 & 0,17    & 2,16 & 0,50     \\
+        \textbf{Summe (Tag)}   & \textbf{8,37} & \textbf{1,92} & \textbf{25,10} & \textbf{5,77} \\
         \hline
         \\
-        Pumpe (Monat, $\approx$30\,d)     & 673,34  & 154,87    & 2020,01 & 464,60      \\
-        Schnecke (Monat)   & 1092,00 & 251,16    & 3276,00 & 753,48      \\
-        \textbf{Summe (Monat)} & \textbf{1765,34} & \textbf{406,03} & \textbf{5296,01} & \textbf{1218,08} \\
+        Pumpe (Monat, $\approx$30\,d)     & 229,38  & 52,76    & 688,14 & 158,27      \\
+        Schnecke (Monat)   & 21,60 & 4,97    & 64,80 & 14,90      \\
+        \textbf{Summe (Monat)} & \textbf{250,98} & \textbf{57,73} & \textbf{752,94} & \textbf{173,18} \\
         \hline
         \\
     \end{tabular}
@@ -73,10 +75,10 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
         \hline
         & Jahr (50:50 Sommer/Winter-Mix) & 10 Jahre \\
         \hline
-        Pumpe [kWh]         & 16\,384,56 & 163\,845,63 \\
-        Schnecke [kWh]      & 26\,572,00 & 265\,720,00 \\
-        \textbf{Summe [kWh]}    & \textbf{42\,956,56} & \textbf{429\,565,63} \\
-        \textbf{Kosten [€]}     & \textbf{9\,880,01} & \textbf{98\,800,10} \\
+        Pumpe [kWh]         & 5\,581,55 & 55\,815,55 \\
+        Schnecke [kWh]      & 525,60 & 5\,256,00 \\
+        \textbf{Summe [kWh]}    & \textbf{6\,107,15} & \textbf{61\,071,55} \\
+        \textbf{Kosten [€]}     & \textbf{1\,404,65} & \textbf{14\,046,46} \\
         \hline
         \\
     \end{tabular}
