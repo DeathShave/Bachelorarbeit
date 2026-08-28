@@ -34,7 +34,7 @@ Für die SSR-Schnecke ist mit $0,18\,\text{kW}$ nur die Nennleistung laut Typens
         Komponente & $f$ [Hz] & $U$ [V] & $I_{\text{Typenschild}}$ [A] & $\cos\varphi$ & $I_{\text{gemessen}}$ [A] & $P$ [kW] \\
         \hline
         Pumpe        & 50 & 400 & 4,8 & 0,89 & 3,1 & 1,91 \\
-        SSR-Schnecke & 50 & 400 & \textit{s. Messprot.} & 0,57 & \textit{s. Messprot.} & 0,18 \\
+        SSR-Schnecke & 50 & 400 & n. a. & 0,57 & n. a. & 0,18 \\
         \hline
         \textbf{Summe} & & & & & & \textbf{2,09} \\
         \hline
@@ -59,7 +59,7 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
         \textbf{Summe (Tag)}   & \textbf{8,37} & \textbf{1,92} & \textbf{25,10} & \textbf{5,77} \\
         \hline
         \\
-        Pumpe (Monat, $\approx$30\,d)     & 229,38  & 52,76    & 688,14 & 158,27      \\
+        Pumpe (Monat $\approx$ 30\,d)     & 229,38  & 52,76    & 688,14 & 158,27      \\
         Schnecke (Monat)   & 21,60 & 4,97    & 64,80 & 14,90      \\
         \textbf{Summe (Monat)} & \textbf{250,98} & \textbf{57,73} & \textbf{752,94} & \textbf{173,18} \\
         \hline
@@ -110,7 +110,7 @@ Im Rahmen des minimalistischen Aufbaus ist das als Erfolg zu verbuchen. Aufgrund
 
 Wie bereits erwähnt, variieren Farben und Formen des Schwimmschlamms stark in Abhängigkeit von Temperatur und Sonnenlicht. Darum ist die einheitliche Annotation insbesondere im Sommer äußerst schwierig, wenn sich primär Plastikpartikel auf der Oberfläche abzeichnen. Diese sind zwar auch zu reinigende Bestandteile, aber unterscheiden sich kaum von der Wasseroberfläche. Vor allem mit dem Auftreten von Spiegelungen lässt sich kein Automatisierungsansatz, wie mit einer Bitmaske, durchführen. \\
 
-Ein alternative Ansatz besteht in dem Trainieren eines kleinen Netzes mittels 15 Bilder, die von Hand klassifiziert werden und das autonom den restlichen Datensatz iterativ einordnet. Anschließend wird nachjustiert, da die Vorhersagen nicht perfekt sind. \\
+Ein alternativer Ansatz besteht in dem Trainieren eines kleinen Netzes mittels 15 Bilder, die von Hand klassifiziert werden und das autonom den restlichen Datensatz iterativ einordnet. Anschließend wird nachjustiert, da die Vorhersagen nicht perfekt sind. Dieser Versuch hat sich jedoch aufgrund des Trainings auf CPU als nicht sonderlich aussagekräftig erwiesen, da sich farblich und in der Helligkeit eine hohe Überschneidung zwischen Schnecke/Brücke zeigt, weswegen das Testmodell dieses Areal fälschlich als Schlamm erkennt. 
 
 Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder des Datensatzes weiterverarbeitet werden. 
 
