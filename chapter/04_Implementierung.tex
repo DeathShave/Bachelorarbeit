@@ -109,4 +109,52 @@ Witterungsschutz: Das Gehäuse ist als IP65-Feuchtraum-Abzweigkasten wetterfest 
 
 Die Führung des 1,2 m langen Kabels wurde mit mehreren Kabelbindern realisiert. Hierbei wurde etwas Spielraum gelassen, damit der Arm für Wartungsarbeiten am verstellbaren Gelenk umgeklappt werden kann. So ist für die Wartung kein zusätzlicher Aufwand nötig.
 
-Aufgrund der Länge des Kabels wurde ein Verlängerungskabel verbunden, das für den Außeneinsatz gedacht und mit der Reling per separatem Kabelschaft verschraubt ist. 
+Aufgrund der Länge des Kabels wurde ein Verlängerungskabel verbunden, das für den Außeneinsatz gedacht und mit der Reling per separatem Kabelschaft verschraubt ist.
+
+\section{Software-Umgebung}
+\label{sec:SoftwareUmgebung}
+
+Zur Nachvollziehbarkeit der Implementierung werden die tatsächlich eingesetzten Programmversionen dokumentiert, getrennt nach dem air-gapped Trainingsrechner (Dell Pro Rugged, siehe Kapitel \ref{Konzept}) und dem produktiven Edge-System (Raspberry Pi 5). Beide Systeme laufen unter Python 3.13.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lll}
+        \hline
+        Komponente & Trainingsrechner & Raspberry Pi 5 \\
+        \hline
+        TensorFlow / Keras     & 2.21.0                 & -- \\
+        TFLite-Laufzeit        & --                     & ai\_edge\_litert \\
+        OpenCV (\texttt{cv2})  & 4.13.0                 & 4.10.0 \\
+        NumPy                  & --                     & 2.2.4 \\
+        Flask                  & --                     & 3.1.3 \\
+        Kamera-Anbindung       & --                     & picamera2 / libcamera \\
+        GPIO                   & --                     & lgpio \\
+        \hline
+        \\
+    \end{tabular}
+    \caption{Software-Umgebung, getrennt nach Trainings- und Zielsystem (Stand: Projektabschluss)}
+    \label{tab:SoftwareVersionen}
+\end{table}
+
+Der Webserver läuft auf dem Raspberry Pi als Flask-Entwicklungsserver (\texttt{app.run(...)} in Listing \ref{lst:app_py}); dieser weist zur Laufzeit selbst darauf hin, dass er nicht für den Dauerbetrieb vorgesehen ist. Da das System innerhalb der Air-Gap-Umgebung ausschließlich über das lokale Punkt-zu-Punkt-Netzwerk zum Trainingsrechner erreichbar ist (siehe Kapitel \ref{Konzept}), ist dies für den hier realisierten Prototypbetrieb tolerierbar; für einen produktiven Dauerbetrieb wäre der Wechsel auf einen WSGI-Server empfehlenswert (siehe Kapitel \ref{Fazit}).
+
+\section{Steuerungssoftware und Weboberfläche}
+\label{sec:Weboberflaeche}
+
+Die gesamte Steuerungssoftware ist als einzelne Flask-Anwendung (\texttt{app.py}, vollständig im Anhang als Listing \ref{lst:app_py}) realisiert, die Kamerasteuerung, TFLite-Inferenz, GPIO-Ansteuerung und einen persistenten Zustand (Einstellungen und Profile als JSON-Dateien) zusammenführt. Ein Automatikmodus löst in konfigurierbarem Intervall Aufnahmen aus und unterscheidet zwei Betriebsarten:
+
+\begin{itemize}
+    \item \textbf{Aufnahme} -- es wird ausschließlich fotografiert, ohne Modellauswertung. Dieser Modus eignet sich, um unbeeinflusst von Modell oder Relaisansteuerung neues Bildmaterial für spätere Annotation zu sammeln.
+    \item \textbf{Analyse} -- zusätzlich zur Aufnahme erfolgt die Inferenz sowie die Schwellenwert-Auswertung inklusive möglicher Relaisschaltung.
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Repräsentativer API-Endpunkt der Weboberfläche für eine manuell ausgelöste Aufnahme (gekürzt)\, vollständig in Listing \ref{lst:app_py}, label=lst:api_capture]
+@app.route("/api/capture", methods=["POST"])
+def api_capture():
+    run_inf = request.json.get("run_inference", False)
+    img = capture_image()
+    result = run_inference(img) if run_inf else None
+    return jsonify(ok=True, result=result)
+\end{lstlisting}
+
+Die Weboberfläche selbst folgt einem dunklen, kontrastarmen Dashboard-Layout: Eine Hauptspalte zeigt den MJPEG-Livestream der Kamera sowie die zuletzt erzeugte Overlay-Auswertung (Originalbild mit halbtransparent eingefärbter Schlammfläche) und einen Verlauf vergangener Auswertungen; eine Seitenspalte bündelt Bildeinstellungen (Schwellenwert, Relaisdauer, Intervall), den in diesem Abschnitt beschriebenen Automatikmodus-Umschalter, die manuelle Relaissteuerung, gespeicherte Profile sowie ein fortlaufendes Live-Log. Statuspunkte in der Kopfzeile zeigen auf einen Blick, ob Kamera, GPIO, Modell und Stream aktiv sind. Umgesetzt ist die Oberfläche als einzelne, serverseitig ausgelieferte HTML-Datei mit eingebettetem CSS und JavaScript (kein separates Frontend-Framework), die per periodischem Abruf (\texttt{fetch}) den Zustand der Flask-Anwendung abfragt und aktualisiert. 

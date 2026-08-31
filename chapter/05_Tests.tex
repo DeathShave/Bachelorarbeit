@@ -139,5 +139,32 @@ Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder d
 
 \subsection{Qualität der Bilderkennung}
 
-\ldots
+\textbf{Evaluationsmethodik:} Der annotierte Datensatz wird mit festem Zufalls-Seed im Verhältnis 70/15/15 in Trainings-, Validierungs- und Testmenge aufgeteilt. Sämtliche Anpassungen an Augmentierung, Klassengewichtung und Entscheidungsschwelle erfolgen ausschließlich anhand der Validierungsmenge; das Testset wird während der gesamten Entwicklung genau einmal am Ende ausgewertet. Diese Trennung verhindert, dass sich durch wiederholtes Beobachten des Testergebnisses und Nachjustieren ein optimistisch verzerrtes, indirekt auf das Testset überangepasstes Bild ergibt.
+
+Tabelle \ref{tab:mIoUErgebnisse} zeigt die mIoU-Entwicklung über die wesentlichen Entwicklungsstufen, jeweils auf dem für das jeweilige Modell unberührten Testset.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lrrr}
+        \hline
+        Variante & IoU Hintergrund & IoU Schlamm & mIoU \\
+        \hline
+        Grobe Sperrzone (Vertikalschnitt) & 0,709 & 0,319 & 0,514 \\
+        Sperrzone 1:1 aus Referenzannotation & 0,720 & 0,332 & 0,526 \\
+        512$\times$512-Eingabegröße (Vergleichsversuch) & 0,916 & 0,562 & 0,739 \\
+        \textbf{Finales Modell (224$\times$224, kalibrierte Schwelle)} & \textbf{0,916} & \textbf{0,566} & \textbf{0,741} \\
+        \hline
+        \\
+    \end{tabular}
+    \caption{mIoU-Entwicklung über die wesentlichen Entwicklungsstufen (Testset, einmalige Auswertung je Modell)}
+    \label{tab:mIoUErgebnisse}
+\end{table}
+
+Der Vergleichsversuch mit 512$\times$512\,Pixel Eingabegröße sollte prüfen, ob eine höhere Auflösung die Erkennungsgüte verbessert. Trotz höherer Auflösung ergab sich kein Genauigkeitsgewinn gegenüber 224$\times$224 bei gleicher Datenmenge -- die Auflösung wurde deshalb nicht beibehalten, da der Datensatz für den erwarteten Detailgewinn zu klein ist.
+
+\textbf{Klassenungleichgewicht und Trainingsinstabilität:} Schlamm-Pixel sind mit 3--11\,\% stark unterrepräsentiert. Ohne Gewichtung kollabiert das Training auf \say{immer Hintergrund}. Bei der geringen Datenmenge (23--30 Trainingsbilder) erwies sich die Klassengewichtung als überraschend instabil: Volle inverse Gewichtung funktionierte zuverlässig, gedämpfte Varianten sowie ein kombinierter Crossentropy-/Dice-Loss kollabierten in mehreren unabhängigen Läufen reproduzierbar auf das jeweils andere Extrem (vollständige Übervorhersage bzw. vollständiges Ausbleiben von Schlamm-Vorhersagen). Die stabilste Lösung war methodisch die einfachste: volle inverse Klassengewichtung beim Training, kombiniert mit einer nachgelagerten, ausschließlich auf der Validierungsmenge kalibrierten Entscheidungsschwelle auf der Schlamm-Wahrscheinlichkeit (statt reinem Argmax). Diese Schwelle wird als eigene Schicht in das exportierte Modell eingebettet, sodass die übrige Verarbeitung weiterhin regulär \texttt{argmax} verwenden kann.
+
+\textbf{Honeypot-Diagnose:} Bilder ohne jede Annotation sind per Definition vollständig Hintergrund. Eine direkte Aufnahme dieser Bilder in das Trainingssignal destabilisierte das Training jedoch reproduzierbar (siehe vorheriger Absatz). Sie werden daher vom Training ausgeschlossen und stattdessen als \say{Honeypot} verwendet: Jede von ihnen vorhergesagte Schlammfläche ist per Konstruktion ein Fehlalarm. Über 11 solcher Bilder lag der mittlere fälschlich als Schlamm markierte Flächenanteil bei 3,0\,\% (9 von 11 Bildern nahe 0\,\%, zwei Ausreißer bei 9\,\% bzw. 20\,\%, vermutlich durch Lichtreflexion).
+
+\textbf{Verifikation der Ausschlusszone:} Um sicherzustellen, dass die in Kapitel \ref{Tests} beschriebene Sperrzone (\texttt{apply\_exclusion\_mask()}, Listing \ref{lst:code_train}) tatsächlich wirkt, wurde für jedes Testbild die Anzahl der vom Modell \emph{vor} der Maskierung als Schlamm eingestuften Pixel innerhalb der Sperrzone mit der Anzahl \emph{nach} der Maskierung verglichen. In allen geprüften Bildern sank dieser Wert von teils über 2.000 Pixeln auf exakt null -- die Maskierung greift unabhängig davon, wie zuversichtlich das Modell dort fälschlich Schlamm vorhersagt.
 
