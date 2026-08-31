@@ -141,7 +141,7 @@ Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder d
 
 \textbf{Evaluationsmethodik:} Der annotierte Datensatz wird mit festem Zufalls-Seed im Verhältnis 70/15/15 in Trainings-, Validierungs- und Testmenge aufgeteilt. Sämtliche Anpassungen an Augmentierung, Klassengewichtung und Entscheidungsschwelle erfolgen ausschließlich anhand der Validierungsmenge; das Testset wird während der gesamten Entwicklung genau einmal am Ende ausgewertet. Diese Trennung verhindert, dass sich durch wiederholtes Beobachten des Testergebnisses und Nachjustieren ein optimistisch verzerrtes, indirekt auf das Testset überangepasstes Bild ergibt.
 
-Tabelle \ref{tab:mIoUErgebnisse} zeigt die mIoU-Entwicklung über die wesentlichen Entwicklungsstufen, jeweils auf dem für das jeweilige Modell unberührten Testset.
+Tabelle \ref{tab:mIoUErgebnisse} zeigt die \textbf{mIoU}\index{mIoU}-Entwicklung über die wesentlichen Entwicklungsstufen, jeweils auf dem für das jeweilige Modell unberührten Testset.
 
 \begin{table}[h]
     \centering
