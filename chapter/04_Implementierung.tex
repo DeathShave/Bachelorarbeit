@@ -37,7 +37,7 @@ Bei dem Gehäuse handelt es sich um einen Feuchtraum-Abzweigkasten (Schutzart IP
 
 Die Stromversorgung des Raspberry Pi erfolgt über das originale 27\,W-USB-C-Netzteil des Raspberry Pi 5, das über ein Verlängerungskabel bis zu einem separaten, ebenfalls wetterfesten Feuchtraum-Verteilerkasten geführt wird, der die eigentliche Netzanbindung vor Ort herstellt (siehe Verteilerkasten am Beckenrand in Abbildung \ref{fig:MontageVorOrt}).
 
-Die \textbf{GPIO}\index{GPIO}-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code (\texttt{app.py}) hinterlegt (Tabelle \ref{tab:GPIOBelegung}); sie betrifft ausschließlich die Relaissteuerung des \textbf{SSR}\index{SSR}-Antriebs. Die Kamera selbst wird nicht über \textbf{GPIO}\index{GPIO}, sondern über die \textbf{CSI}\index{CSI}-Schnittstelle angebunden und ist davon unabhängig.
+Die \textbf{GPIO}\index{GPIO}-Pinbelegung für die Relais-/Aktorikansteuerung ist im Steuerungs-Code (\texttt{app.py}, vollständig abgedruckt im Anhang als Listing \ref{lst:app_py}) hinterlegt (Tabelle \ref{tab:GPIOBelegung}); sie betrifft ausschließlich die Relaissteuerung des \textbf{SSR}\index{SSR}-Antriebs. Die Kamera selbst wird nicht über \textbf{GPIO}\index{GPIO}, sondern über die \textbf{CSI}\index{CSI}-Schnittstelle angebunden und ist davon unabhängig.
 
 \begin{table}[h]
     \centering

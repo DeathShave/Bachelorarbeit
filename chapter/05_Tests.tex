@@ -88,6 +88,27 @@ Aus der Ist-Aufnahme lässt sich zudem die bisherige Betriebsdauer der Timer-Ste
 
 Diese Ist-Zustand-Werte bilden die Referenz für den Vorher-/Nachher-Vergleich: Erst mit den entsprechenden Messwerten der bedarfsorientierten, semantisch gesteuerten Lösung lässt sich die tatsächliche Einsparung an Energie und Kosten beziffern.
 
+\subsection{Einordnung im Gesamtenergiebedarf einer Kläranlage}
+\label{sec:EinordnungEnergiebedarf}
+
+Um die in Tabelle \ref{tab:VerbrauchIstZustandJahr} berechneten Verbrauchswerte von SSR-Antrieb und Pumpe richtig einzuordnen, lohnt sich der Vergleich mit dem Gesamtenergiebedarf einer Kläranlage: Die Belüftung der Belebungsbecken ist mit Abstand der größte Einzelverbraucher einer Kläranlage und macht je nach Schlammbehandlungsverfahren zwischen 50\,\% (bei Anlagen mit Schlammfaulung, wie am Klärwerk Waßmannsdorf) und bis zu 80\,\% (bei rein aerober Schlammstabilisierung) des gesamten Stromverbrauchs aus \cite{Aerzen_2026}. Als branchenweite Kennzahl hat sich der spezifische Jahresenergieverbrauch pro Einwohnerwert (kWh/(EW$\cdot$a)) etabliert; laut dem 33. Leistungsnachweis kommunaler Kläranlagen der \textbf{DWA} konnte dieser Wert bundesweit von 34\,kWh/(EW$\cdot$a) im Jahr 2011 auf 31,2\,kWh/(EW$\cdot$a) im Jahr 2020 gesenkt werden, unter anderem durch eine gestiegene Eigenstromerzeugung aus Faulgas, die 2020 bereits 36\,\% des Elektrizitätsverbrauchs deckte \cite{DWA_2020}.
+
+Für das Klärwerk Waßmannsdorf lässt sich daraus folgende überschlägige \textbf{Beispielrechnung} zur Größenordnung des Gesamtenergiebedarfs ableiten: Die Anlage ist auf eine Reinigungskapazität von 230.000\,m\textsuperscript{3} Abwasser pro Tag bei Trockenwetter ausgelegt und verfügt über acht Belebungsbecken mit einem Gesamtnutzvolumen von 203.600\,m\textsuperscript{3} \cite{BWB_Wassmannsdorf_2017}. Unter der für kommunales Abwasser üblichen Bemessungsannahme von rund 150\,l/(EW$\cdot$d) \cite{Aerzen_2026} ergibt sich daraus ein angeschlossener Einwohnerwert von überschlägig
+\begin{equation}
+    EW \approx \frac{230.000.000\,\text{l/d}}{150\,\text{l/(EW}\cdot\text{d)}} \approx 1{,}53\,\text{Mio.\ EW.}
+\end{equation}
+Mit dem branchenüblichen spezifischen Verbrauch von 31,2\,kWh/(EW$\cdot$a) \cite{DWA_2020} folgt ein grob geschätzter Gesamt-Jahresstromverbrauch von
+\begin{equation}
+    W_{\text{Jahr}} \approx 1{,}53\,\text{Mio.\ EW} \times 31{,}2\,\frac{\text{kWh}}{\text{EW}\cdot\text{a}} \approx 47{,}8\,\text{Mio.\ kWh/Jahr,}
+\end{equation}
+wovon bei einem für Anlagen mit Schlammfaulung typischen Belüftungsanteil von rund 50\,\% \cite{Aerzen_2026} allein die Belüftung der acht Belebungsbecken überschlägig
+\begin{equation}
+    W_{\text{Belüftung}} \approx 0{,}5 \times 47{,}8\,\text{Mio.\ kWh/Jahr} \approx 23{,}9\,\text{Mio.\ kWh/Jahr}
+\end{equation}
+beansprucht.
+
+Stellt man diesen überschlägigen Wert dem in Tabelle \ref{tab:VerbrauchIstZustandJahr} berechneten Jahresverbrauch der SSR-Schnecke von 525,6\,kWh gegenüber, ergibt sich ein Verhältnis von lediglich rund $525{,}6 / 23{,}9\cdot10^6 \approx 0{,}0022\,\%$. Das verdeutlicht: Innerhalb des in dieser Arbeit betrachteten Einzelbeckens ist die realisierte Einsparung an SSR-Betriebsstunden relativ bedeutsam, im Verhältnis zum Gesamtenergiebedarf der Belebungslinie einer Kläranlage dieser Größenordnung -- der ganz überwiegend von der Belüftung dominiert wird -- ist sie hingegen verschwindend gering. Dies stützt die bereits in Kapitel \ref{Fazit} formulierte Einschätzung, dass sich der wirtschaftliche und energetische Nutzen des entwickelten Systems erst bei einer flächendeckenden Skalierung über mehrere Becken bzw. Standorte hinweg signifikant bemerkbar machen würde; alle hier angegebenen Werte sind als überschlägige Größenordnungsabschätzung auf Basis öffentlich zugänglicher Kennzahlen zu verstehen, nicht als tatsächliche Ist-Messung des Klärwerks Waßmannsdorf.
+
 \subsection{Leistungstests/Performancetests}
 Zusätzlich zu den Vergleichstest mit den Einsparpotenzialen und Optimierungsmöglichkeiten, bedarf es einer Auflistung der jeweiligen Kostenpunkte, Berechnung des Wartungsaufwands und allgemeiner Probleme, die im laufenden Betrieb aufkommen werden. Die Bewertung eines Prototyps inklusive der Folgen, die sich daraus ergeben, hängt wesentlich von der korrekten Funktion selbst und seiner Beständigkeit ab.  \\ \\
 
@@ -110,9 +131,11 @@ Im Rahmen des minimalistischen Aufbaus ist das als Erfolg zu verbuchen. Aufgrund
 
 Wie bereits erwähnt, variieren Farben und Formen des Schwimmschlamms stark in Abhängigkeit von Temperatur und Sonnenlicht. Darum ist die einheitliche Annotation insbesondere im Sommer äußerst schwierig, wenn sich primär Plastikpartikel auf der Oberfläche abzeichnen. Diese sind zwar auch zu reinigende Bestandteile, aber unterscheiden sich kaum von der Wasseroberfläche. Vor allem mit dem Auftreten von Spiegelungen lässt sich kein Automatisierungsansatz, wie mit einer Bitmaske, durchführen. \\
 
-Ein alternativer Ansatz besteht in dem Trainieren eines kleinen Netzes mittels 15 Bilder, die von Hand klassifiziert werden und das autonom den restlichen Datensatz iterativ einordnet. Anschließend wird nachjustiert, da die Vorhersagen nicht perfekt sind. Dieser Versuch hat sich jedoch aufgrund des Trainings auf CPU als nicht sonderlich aussagekräftig erwiesen, da sich farblich und in der Helligkeit eine hohe Überschneidung zwischen Schnecke/Brücke zeigt, weswegen das Testmodell dieses Areal fälschlich als Schlamm erkennt. 
+Ein alternativer Ansatz besteht in dem Trainieren eines kleinen Netzes mittels 15 Bilder, die von Hand klassifiziert werden und das autonom den restlichen Datensatz iterativ einordnet. Anschließend wird nachjustiert, da die Vorhersagen nicht perfekt sind. Dieser Versuch hat sich jedoch aufgrund des Trainings auf CPU als nicht sonderlich aussagekräftig erwiesen, da sich farblich und in der Helligkeit eine hohe Überschneidung zwischen Schnecke/Brücke zeigt, weswegen das Testmodell dieses Areal fälschlich als Schlamm erkennt.
 
-Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder des Datensatzes weiterverarbeitet werden. 
+Da eine Modellarchitektur allein diese systematische Verwechslung nicht zuverlässig auflösen kann -- Schnecke und Brücke sind fest montiert und liegen in jedem Bild geometrisch im selben Bereich --, wird dieser Bereich zusätzlich hart über eine feste, aus einer Referenzannotation abgeleitete Ausschlusszone (Polygon, siehe \texttt{apply\_exclusion\_mask()} in Listing \ref{lst:code_train}) auf Hintergrund erzwungen, unabhängig von der eigentlichen Modellvorhersage. Diese Zone wird sowohl bei der Test-Set-Evaluierung als auch bei der späteren Inferenz auf dem Raspberry Pi (Listing \ref{lst:app_py}) identisch angewendet, damit das gemessene und das produktiv beobachtete Verhalten übereinstimmen.
+
+Zuletzt erfolgt das Training des Gesamtnetzes, wofür die überprüften Bilder des Datensatzes weiterverarbeitet werden. Das vollständige Trainingsskript inklusive U-Net-Architektur (Abschnitt \ref{sec:UNetGrundlagen}), Klassengewichtung gegen die Unterrepräsentation von Schlamm-Pixeln sowie Augmentierungspipeline ist im Anhang als Listing \ref{lst:code_train} abgedruckt.
 
 \subsection{Qualität der Bilderkennung}
 

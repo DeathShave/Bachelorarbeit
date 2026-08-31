@@ -243,6 +243,1846 @@ Write-Host "`n`n--- FERTIG! ---" -ForegroundColor Cyan
 Pause
 \end{lstlisting}
 
+\section{Quelltext der Steuerungs- und Trainingssoftware}
+\label{sec:AnhangCode}
+
+Die folgenden beiden Skripte bilden den Kern der in Kapitel \ref{Implementierung} beschriebenen Software: das Steuerungsprogramm \texttt{app.py}, das auf dem Raspberry Pi 5 läuft (Aufnahme, Inferenz, Relaisansteuerung, Weboberfläche), sowie das Trainingsskript, mit dem das U-Net-Segmentierungsmodell (siehe Abschnitt \ref{sec:UNetGrundlagen}) auf dem Air-Gap-Notebook trainiert und als quantisiertes \texttt{.tflite}-Modell exportiert wird (siehe Abschnitt \ref{Tests}, Unterabschnitt \say{Training des Neuronalen Netzes}). Aus Gründen der Lesbarkeit sind beide Dateien vollständig, unverändert bis auf die Normalisierung einzelner Sonderzeichen für den Textsatz, abgedruckt.
+
+\begin{lstlisting}[language=Python, caption=Steuerungssoftware des Raspberry Pi (app.py) -- Kamerasteuerung\, Inferenz\, GPIO/Relaisansteuerung und Flask-Weboberfläche, label=lst:app_py]
+ 
+# =============================================================================
+#  app.py  --  Raspberry Pi Segmentierungs- & Steuerungs-Backend  (final)
+#  Start : python app.py
+#  UI    : http://localhost:5000  |  http://<pi-ip>:5000
+# =============================================================================
+import sys
+sys.path.append('/usr/lib/python3/dist-packages')   # libcamera für Conda-Umgebungen
+
+import os, time, logging, threading, json, tempfile
+from collections import deque
+from datetime import datetime
+
+import numpy as np
+import cv2
+from flask import Flask, jsonify, render_template, Response, request, send_file
+
+# -- Picamera2 -----------------------------------------------------------------
+try:
+    from picamera2 import Picamera2
+    CAMERA_AVAILABLE = True
+except Exception as _cam_err:
+    CAMERA_AVAILABLE = False
+    _cam_err_msg = str(_cam_err)
+
+# -- TFLite  (tflite_runtime bevorzugt, ai-edge-litert / volles TF als Fallback) -
+#
+#  tflite_runtime gibt es nicht mehr für aktuelle Python-Versionen.
+#  Google pflegt stattdessen "ai-edge-litert" (gleiche Interpreter-API,
+#
+try:
+    from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
+    TFLITE_BACKEND = "tflite_runtime"
+    TFLITE_AVAILABLE = True
+except ImportError:
+    try:
+        from ai_edge_litert.interpreter import Interpreter as TFLiteInterpreter
+        TFLITE_BACKEND = "ai_edge_litert"
+        TFLITE_AVAILABLE = True
+    except ImportError:
+        try:
+            from tensorflow.lite.python.interpreter import Interpreter as TFLiteInterpreter
+            TFLITE_BACKEND = "tensorflow"
+            TFLITE_AVAILABLE = True
+        except ImportError:
+            TFLITE_AVAILABLE = False
+            TFLITE_BACKEND = "none"
+
+# -- lgpio ---------------------------------------------------------------------
+try:
+    import lgpio
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False
+
+
+# =============================================================================
+# KONFIGURATION  --  hier anpassen
+# =============================================================================
+
+SAVE_DIR      = '/home/pi/Desktop/Kamera_Setup/Kamera_Bilder'
+ABGLEICH_DIR  = '/home/pi/Desktop/Kamera_Setup/Kamera_Abgleiche'   # Overlay-Bilder je Inferenz, dauerhaftes Archiv
+LAST_OVERLAY_PATH = os.path.join(tempfile.gettempdir(), "schlamm_last_abgleich.jpg")   # nur EIN Bild
+                                  # für die Live-Anzeige auf der Website -- wird bei jeder neuen
+                                  # Inferenz überschrieben (kein Archiv, keine Ansammlung alter Bilder)
+TFLITE_PATH   = '/home/pi/Desktop/Kamera_Setup/model_20260827-110435_int8.tflite'
+LOG_FILE      = '/home/pi/camera_system.log'
+PROFILES_FILE = '/home/pi/camera_profiles.json'
+STATE_FILE    = '/home/pi/camera_state.json'
+
+IMG_SIZE         = 224        # muss mit Training übereinstimmen (Modell-Eingabe, NICHT Aufnahmeauflösung)
+CAPTURE_SIZE     = (4608, 2592)  # native Aufnahmeauflösung für gespeicherte Bilder/Annotation; | nativ 4608 x 2592
+                                  # wird in run_inference() ohnehin auf IMG_SIZE herunterskaliert
+# Feste Fokusdistanz für Standbilder (statt Autofokus-Suchlauf pro Aufnahme, s. _apply_night_controls):
+# Bei Fokus auf STILL_FOCUS_DISTANCE_M liegt die Schärfentiefe für Camera Module 3 WIDE NoIR
+# (f=2,75mm, Blende 2.2, IMX708-Pixelpitch 1,4µm, Zerstreuungskreis = 2x Pixelpitch) rechnerisch
+# zwischen ~0,78m und unendlich -- deckt die Distanzschwankung durch die Armvibration bei
+# 2,1m Objektabstand also mit großem Spielraum ab, ohne dass pro Aufnahme neu fokussiert
+# werden muss (behebt zugleich das gelegentliche "Autofokus: Zyklus ohne Erfolg" auf der
+# texturarmen Wasseroberfläche).
+STILL_FOCUS_DISTANCE_M = 2.1
+STILL_LENS_POSITION    = 1.0 / STILL_FOCUS_DISTANCE_M   # Dioptrien = 1/Meter
+NUM_CLASSES      = 2
+CLASS_NAMES      = {0: "Wasser", 1: "Schlamm", 2: "Brücke", 3: "Schnecke", 4: "Rohr"}
+CLASS_COLORS_BGR = {0: (30, 30, 30), 1: (50, 200, 80)} #Weitere Farbcodes hinzufügen, falls möglich. Andernfalls Code farbunabhängig machen
+
+# Geometrische Ausschlusszone (Schnecke/Brücke) -- 1:1 aus code_train.py übernommen (siehe dort
+# für Herleitung aus der Referenzannotation bild_tag_20260804_114627.json). Muss hier UND beim
+# Training gleich sein, sonst weicht die Pi-Inferenz vom trainierten/getesteten Verhalten ab.
+EXCLUSION_POLYGON_NORM = [
+    (0.594370, 0.000087),
+    (0.496390, 1.000000),
+    (0.997833, 1.000000),
+    (0.997833, 0.000000),
+]
+
+
+def apply_exclusion_mask(pred_mask: np.ndarray) -> np.ndarray:
+    """Erzwingt Hintergrund (Klasse 0) im festen Schnecke/Brücke-Bereich, unabhängig von der
+    Modellvorhersage. pred_mask: (H, W) Klassenmaske."""
+    h, w = pred_mask.shape[:2]
+    pts = np.array([(round(x * w), round(y * h)) for x, y in EXCLUSION_POLYGON_NORM], dtype=np.int32)
+    masked = pred_mask.astype(np.int32).copy()
+    cv2.fillPoly(masked, [pts], 0)
+    return masked.astype(pred_mask.dtype)
+
+GPIO_CHIP  = 0
+RELAY_PINS = {"R1": 17, "R2": 27, "R3": 22, "R4": 23}
+RELAY_ON   = 0    # LOW = EIN bei diesem Relaismodul
+RELAY_OFF  = 1
+
+MAX_HISTORY  = 10_000   # Events im RAM (unbegrenzte Ausgabe per ?limit=)
+LOG_RAM_SIZE = 5_000    # Log-Zeilen im RAM-Puffer
+
+
+# =============================================================================
+# LOGGING  --  Datei + RAM-Puffer (für /api/log ohne Zeilenlimit)
+# =============================================================================
+
+os.makedirs(SAVE_DIR, exist_ok=True)
+os.makedirs(ABGLEICH_DIR, exist_ok=True)
+
+log_buffer: deque = deque(maxlen=LOG_RAM_SIZE)
+
+class _RamHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            log_buffer.append(self.format(record))
+        except Exception:
+            pass
+
+_fmt    = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s',
+                             datefmt='%Y-%m-%d %H:%M:%S')
+_file_h = logging.FileHandler(LOG_FILE, encoding='utf-8')
+_file_h.setFormatter(_fmt)
+_ram_h  = _RamHandler()
+_ram_h.setFormatter(_fmt)
+
+# basicConfig nur wenn noch kein Handler konfiguriert
+root_log = logging.getLogger()
+if not root_log.handlers:
+    root_log.setLevel(logging.INFO)
+    root_log.addHandler(_file_h)
+    root_log.addHandler(_ram_h)
+else:
+    root_log.addHandler(_ram_h)
+    root_log.setLevel(logging.INFO)
+
+log = logging.getLogger(__name__)
+
+
+# =============================================================================
+# PERSISTENZ  --  Zustand & Profile überleben Neustarts
+# =============================================================================
+
+def _load_state() -> dict:
+    try:
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        # log noch nicht sicher verfügbar, print reicht
+        print(f"[WARN] State-Load: {e}")
+    return {}
+
+
+def _save_state(s: dict):
+    """Persistiert nur die Felder die einen Neustart überleben sollen."""
+    try:
+        with open(STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({
+                "images_captured":    s.get("images_captured", 0),
+                "threshold_pct":      s.get("threshold_pct", 50.0),
+                "relay_duration_s":   s.get("relay_duration_s", 30),
+                "interval_minutes":   s.get("interval_minutes", 5),
+                "auto_relays_enabled": s.get("auto_relays_enabled", True),
+                "night_mode":         s.get("night_mode", False),
+                "night_capture_enabled": s.get("night_capture_enabled", False),
+            }, f, indent=2)
+    except Exception as e:
+        log.warning(f"State-Save: {e}")
+
+
+def _load_profiles() -> list:
+    try:
+        if os.path.exists(PROFILES_FILE):
+            with open(PROFILES_FILE, encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                while len(data) < 3:
+                    data.append(None)
+                return data[:3]
+    except Exception as e:
+        print(f"[WARN] Profile-Load: {e}")
+    return [None, None, None]
+
+
+def _save_profiles(profiles: list) -> bool:
+    try:
+        with open(PROFILES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(profiles[:3], f, indent=2)
+        return True
+    except Exception as e:
+        log.error(f"Profile-Save: {e}")
+        return False
+
+
+# =============================================================================
+# GLOBALER ZUSTAND
+# =============================================================================
+
+_p = _load_state()   # persistierte Werte
+
+state = {
+    # -- Persistiert ----------------------------------------------------------
+    "images_captured":     _p.get("images_captured", 0),
+    "threshold_pct":       _p.get("threshold_pct", 50.0),
+    "relay_duration_s":    _p.get("relay_duration_s", 30),
+    "interval_minutes":    _p.get("interval_minutes", 5),
+    "auto_relays_enabled": _p.get("auto_relays_enabled", True),
+    "night_mode":          _p.get("night_mode", False),
+    "night_capture_enabled": _p.get("night_capture_enabled", False),
+    "auto_mode":           _p.get("auto_mode", "analyse"),   # "analyse" = Aufnahme+Inferenz, "aufnahme" = nur Aufnahme
+    # -- Laufzeit (nicht persistiert) -----------------------------------------
+    "last_image_path":     None,
+    "last_capture_meta":   None,
+    "last_result":         None,
+    "last_inference_ms":   None,
+    "overlay_version":     0,   # zählt hoch bei jedem neuen Abgleich-Bild (für Cache-Busting im Frontend)
+    "auto_active":         False,
+    "relay_state":         {k: False for k in RELAY_PINS},
+    "relay_active":        False,
+    "timer_expires_at":    None,
+    "timer_remaining_s":   0,
+    "profiles":            _load_profiles(),
+    "error":               None,
+}
+state_lock = threading.Lock()
+
+event_history: deque = deque(maxlen=MAX_HISTORY)
+
+# Hardware-Handles  (werden in init_* gesetzt)
+picam2      = None
+gpio_handle = None
+interpreter = None
+inp_idx     = None   # dynamisch aus Modell gelesen -- NICHT hardcoden
+out_idx     = None
+
+# Thread-Handles
+auto_thread = None
+auto_stop   = threading.Event()
+_timer_lock = threading.Lock()
+_timer_th   = None
+
+live_frame_lock = threading.Lock()
+live_frame_jpg  = None
+live_thread     = None
+live_stop       = threading.Event()
+live_stop.set()   # initial gestoppt
+
+
+# =============================================================================
+# GPIO / RELAIS
+# =============================================================================
+
+def init_gpio() -> bool:
+    global gpio_handle
+    if not GPIO_AVAILABLE:
+        log.warning("lgpio nicht gefunden -- GPIO deaktiviert. ")
+        return False
+    try:
+        gpio_handle = lgpio.gpiochip_open(GPIO_CHIP)
+        for pin in RELAY_PINS.values():
+            lgpio.gpio_claim_output(gpio_handle, pin)
+            lgpio.gpio_write(gpio_handle, pin, RELAY_OFF)
+        log.info(f"GPIO initialisiert (Chip {GPIO_CHIP}), alle Relais AUS.")
+        return True
+    except Exception as e:
+        log.error(f"GPIO-Init fehlgeschlagen: {e}")
+        return False
+
+
+def _write_relay(name: str, on: bool):
+    if not GPIO_AVAILABLE or gpio_handle is None:
+        # Im Sim-Modus trotzdem State aktualisieren
+        with state_lock:
+            state["relay_state"][name] = on
+            state["relay_active"] = any(state["relay_state"].values())
+        return
+    pin = RELAY_PINS.get(name)
+    if pin is None:
+        return
+    try:
+        lgpio.gpio_write(gpio_handle, pin, RELAY_ON if on else RELAY_OFF)
+    except Exception as e:
+        log.error(f"GPIO-Write {name} (GPIO{pin}): {e}")
+        return
+    with state_lock:
+        state["relay_state"][name] = on
+        state["relay_active"] = any(state["relay_state"].values())
+    log.info(f"Relais {name} (GPIO{pin}): {'EIN' if on else 'AUS'}")
+
+
+def relays_on(names: list = None):
+    for n in (names or list(RELAY_PINS)):
+        _write_relay(n, True)
+
+
+def relays_off(names: list = None):
+    for n in (names or list(RELAY_PINS)):
+        _write_relay(n, False)
+
+
+def cleanup_gpio():
+    if GPIO_AVAILABLE and gpio_handle is not None:
+        try:
+            relays_off()
+            lgpio.gpiochip_close(gpio_handle)
+            log.info("GPIO freigegeben.")
+        except Exception as e:
+            log.error(f"GPIO-Cleanup: {e}")
+
+
+# =============================================================================
+# RELAY-TIMER  --  reset-fähiger Countdown
+# =============================================================================
+
+def _timer_worker():
+    """Läuft bis timer_expires_at, verlängert sich automatisch bei Reset."""
+    while True:
+        with state_lock:
+            exp = state["timer_expires_at"]
+        if exp is None:
+            return
+        remaining = exp - time.time()
+        if remaining <= 0:
+            break
+        time.sleep(min(0.5, remaining))
+
+    with state_lock:
+        exp     = state["timer_expires_at"]
+        expired = exp is not None and time.time() >= exp
+        if expired:
+            state["timer_expires_at"]  = None
+            state["timer_remaining_s"] = 0
+
+    if expired:
+        relays_off()
+        log.info("Relay-Timer abgelaufen -> alle Relais AUS.")
+
+
+def start_or_reset_relay_timer():
+    """Schaltet Relais EIN und startet / verlängert den Abschalt-Timer."""
+    global _timer_th
+    with state_lock:
+        state["timer_expires_at"] = time.time() + state["relay_duration_s"]
+    relays_on()
+    with _timer_lock:
+        if _timer_th is None or not _timer_th.is_alive():
+            _timer_th = threading.Thread(target=_timer_worker, daemon=True)
+            _timer_th.start()
+
+
+def _refresh_timer_remaining():
+    with state_lock:
+        exp = state["timer_expires_at"]
+        if exp is None:
+            state["timer_remaining_s"] = 0
+        else:
+            rem = max(0.0, round(exp - time.time(), 1))
+            state["timer_remaining_s"] = rem
+            if rem == 0:
+                state["timer_expires_at"] = None
+
+
+# =============================================================================
+# KAMERA  --  picamera2 / Camera Module 3 NoIR
+# =============================================================================
+
+def init_camera() -> bool:
+    global picam2
+    if not CAMERA_AVAILABLE:
+        log.warning(f"picamera2 nicht verfügbar: {globals().get('_cam_err_msg','')}")
+        return False
+    try:
+        picam2 = Picamera2()
+        log.info("Kamera (picamera2) initialisiert.")
+        return True
+    except Exception as e:
+        log.error(f"Kamera-Init fehlgeschlagen: {e}")
+        with state_lock:
+            state["error"] = f"Kamera-Init: {e}"
+        return False
+
+
+def _still_cfg():
+    """Still-Konfiguration für Einzelaufnahmen (native Auflösung, siehe CAPTURE_SIZE).
+    Downscaling auf IMG_SIZE passiert erst in run_inference() -- so bleiben die
+    gespeicherten Bilder in voller Qualität für Annotation/Training erhalten."""
+    return picam2.create_still_configuration(
+        main={"size": CAPTURE_SIZE, "format": "RGB888"}
+    )
+
+
+def _preview_cfg():
+    """Preview-Konfiguration für den Live-Stream (640×480, schnell)."""
+    return picam2.create_preview_configuration(
+        main={"size": (640, 480), "format": "RGB888"}
+    )
+
+
+def _apply_night_controls(cam, night: bool, continuous_af: bool = False):
+    """
+    Setzt Kamera-Controls für Tag- oder Nachtmodus.
+    Muss nach jedem picam2.configure() erneut aufgerufen werden,
+    weil configure() alle Controls auf Kamera-Defaults zurücksetzt.
+    Das ist der Grund warum der Automatikmodus ohne diesen Aufruf
+    immer im Tagmodus aufnimmt, auch wenn Nachtmodus aktiv ist.
+
+    continuous_af=True (Live-Stream): AfMode "Continuous" (2), damit beim
+    Justieren des Neigungswinkels (Spiegelungsminimum suchen) live
+    nachfokussiert wird -- hier ändert sich der Objektabstand während der
+    Justage tatsächlich stark, ein Suchlauf ist also nötig.
+    continuous_af=False (Stills, Default): AfMode "Manual" (0) mit fester
+    Fokusdistanz STILL_FOCUS_DISTANCE_M statt Suchlauf pro Aufnahme -- die
+    Schärfentiefe bei dieser Distanz deckt die Armvibration bereits komplett
+    ab (s. Konstanten-Kommentar), ein Autofokus-Suchlauf auf der texturarmen
+    Wasseroberfläche wäre nur eine unnötige Fehlerquelle (führte früher
+    gelegentlich zu "Autofokus: Zyklus ohne Erfolg").
+    """
+    try:
+        if continuous_af:
+            af_controls = {
+                "AfMode":  2,
+                "AfRange": 0,   # Normal: Makrobereich (wenige cm) wird nicht durchsucht, schneller
+                "AfSpeed": 1,   # Fast: kürzerer Suchvorgang -- wichtig bei vibrierender Halterung
+            }
+        else:
+            af_controls = {
+                "AfMode":       0,   # Manual
+                "LensPosition": STILL_LENS_POSITION,
+            }
+
+        if night:
+            cam.set_controls({
+                "AeEnable":     False,      # manuelle Belichtung fixieren
+                "ExposureTime": 6_000,      # 6 ms: der schwankende Kameraarm überträgt sich bei
+                                            # 2,1 m Objektabstand in ein Vielfaches an seitlicher
+                                            # Verschiebung an der Wasseroberfläche -- zusätzlich zur
+                                            # Sedimentbewegung im Wasser der Hauptgrund für kurze
+                                            # Belichtungszeit; ggf. an IR-Beleuchtung anpassen
+                "AnalogueGain": 16.0,       # Sensor-Maximum (IMX708): gleicht kurze Belichtung +
+                                            # Polfilter-Lichtverlust aus. Mehr Rauschen als Kompromiss,
+                                            # aber Bewegungsunschärfe/Rolling-Shutter-Verzerrung durch
+                                            # den Arm wiegt für die Annotation schwerer als Bildrauschen
+                "AwbEnable":    False,       # AWB aus: IR verfälscht Weißabgleich
+                "ColourGains":  (1.0, 1.0), # neutrale Gains (IR-Bild monochrom)
+                "Saturation":   0.0,         # Graustufen
+                "Sharpness":    3.0,         # Standard ist 1.0; gleicht die durch
+                                            # NoiseReductionMode="Fast" (statt
+                                            # "HighQuality") weniger geglätteten
+                                            # Kanten wieder aus
+            })
+            try:
+                cam.set_controls(af_controls)
+            except Exception:
+                pass
+        else:
+            # AeEnable MUSS explizit wieder aktiviert werden: ExposureTime/
+            # AnalogueGain im Nachtmodus schalten AE intern aus, und ohne
+            # diesen Reset bleiben die manuellen Nacht-Belichtungswerte
+            # hängen -- das Bild ist dann tagsüber massiv überbelichtet.
+            cam.set_controls({
+                "AeEnable":   True,
+                "AwbEnable":  True,
+                "Saturation": 1.0,
+                "Sharpness":  3.0,
+            })
+            try:
+                # FrameDurationLimits zwingt die Automatik, Lichtverlust (Polfilter)
+                # UND die Armschwankung über AnalogueGain statt über eine längere
+                # Belichtungszeit auszugleichen -- sonst kommt die Bewegungsunschärfe
+                # durch die Hintertür zurück. Obergrenze bewusst niedrig (8 ms).
+                cam.set_controls({"FrameDurationLimits": (4_000, 8_000)})
+            except Exception:
+                pass
+            try:
+                cam.set_controls(af_controls)
+            except Exception:
+                pass
+    except Exception as e:
+        log.warning(f"Kamera-Controls: {e}")
+
+
+def _extract_capture_meta(meta: "dict | None") -> dict:
+    """
+    Extrahiert die für die Bildqualitäts-Analyse relevanten Felder aus
+    picam2.capture_metadata() (z.B. ExposureTime/AnalogueGain der Tag-
+    Automatik) -- ermöglicht die nachträgliche, datenbasierte Prüfung, wie
+    viel Spielraum bei ISO/Verschlusszeit tatsächlich besteht, statt sich
+    auf Schätzungen zu verlassen. Fehlende Felder (abhängig von Tuning-Datei/
+    Firmware) werden defensiv übersprungen statt einen Fehler zu werfen.
+    """
+    if not meta:
+        return {}
+    keys = ["ExposureTime", "AnalogueGain", "DigitalGain",
+            "ColourTemperature", "Lux", "FocusFoM"]
+    return {k: meta[k] for k in keys if k in meta}
+
+
+def _apply_still_quality_controls(cam):
+    """Zusätzliche Qualitäts-Controls nur für Einzelaufnahmen (nicht Live-Stream).
+    NoiseReductionMode="Fast" statt "HighQuality": HighQuality glättet bei wenig
+    Licht (insbesondere mit dem lichtschluckenden Polfilter + hohem AnalogueGain)
+    Kanten und feine Struktur weg -- das wirkt wie Unschärfe, ist aber Rauschglättung.
+    Fast + höheres Sharpness (siehe _apply_night_controls) erhält mehr Detail."""
+    try:
+        cam.set_controls({"NoiseReductionMode": 1})  # 0=Off, 1=Fast, 2=HighQuality
+    except Exception as e:
+        log.warning(f"Quality-Controls: {e}")
+
+
+NIGHT_BRIGHTNESS_THRESHOLD = 60   # mittlere Graustufen-Helligkeit (0-255); darunter -> Nachtmodus
+MIN_USABLE_BRIGHTNESS      = 12   # darunter: praktisch schwarzes Rauschen (z.B. Tagmodus-Belichtung
+                                   # bei völliger Dunkelheit, ohne Nachtmodus-Kompensation) -- die
+                                   # Aufnahme wird dann verworfen statt gespeichert/ausgewertet.
+
+
+def _measure_brightness(img_rgb: np.ndarray) -> float:
+    """Mittlere Helligkeit (0-255) eines RGB-Bilds für die Tag/Nacht-Erkennung."""
+    return float(np.mean(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)))
+
+
+def capture_image(auto_detect: bool = False) -> "np.ndarray | None":
+    """
+    Einzelaufnahme. Unterbricht den Live-Stream falls aktiv,
+    wendet den aktuellen Nachtmodus an und startet den Stream danach
+    wieder -- auch im Fehlerfall.
+
+    auto_detect=True (Automatikmodus): Tag/Nacht wird nicht vom manuellen
+    Schalter übernommen, sondern anhand der gemessenen Bildhelligkeit einer
+    Tag-Probeaufnahme selbst entschieden (state["night_mode"] wird dabei
+    aktualisiert, damit UI-Anzeige und Dateiname konsistent bleiben).
+
+    Der Master-Schalter state["night_capture_enabled"] steht über beiden
+    Modi: ist er aus (Standard -- Nachtaufnahmen werden aktuell nicht
+    benötigt), wird jede Aufnahme im Tagmodus gemacht, unabhängig von
+    night_mode oder gemessener Helligkeit. Erst wenn er eingeschaltet wird,
+    greifen der manuelle Nachtmodus-Schalter bzw. die Auto-Erkennung.
+    """
+    if not CAMERA_AVAILABLE or picam2 is None:
+        log.error("capture_image: Kamera nicht verfügbar.")
+        with state_lock:
+            state["error"] = "Kamera nicht verfügbar"
+        return None
+
+    was_live = False
+    try:
+        was_live = not live_stop.is_set()
+        if was_live:
+            live_stop.set()
+            time.sleep(0.6)   # Warten bis Live-Thread die Kamera freigibt
+
+        picam2.configure(_still_cfg())
+        picam2.start()
+
+        with state_lock:
+            night_capture_enabled = state["night_capture_enabled"]
+
+        if auto_detect:
+            if not night_capture_enabled:
+                # Master-Schalter aus -> immer Tagmodus, keine Helligkeits-
+                # Probeaufnahme nötig
+                night = False
+                _apply_night_controls(picam2, False)
+                _apply_still_quality_controls(picam2)
+                time.sleep(2.0)
+                img_rgb = picam2.capture_array()
+                meta    = picam2.capture_metadata()
+                with state_lock:
+                    if state["night_mode"] != False:
+                        state["night_mode"] = False
+                        _save_state(state)
+            else:
+                # 1. Probeaufnahme mit Tag-/Autobelichtung zur Helligkeitsmessung
+                # (wird bei Tageslicht direkt als finales Bild übernommen, siehe unten
+                # -> Qualitäts-Controls müssen daher schon hier gesetzt werden)
+                _apply_night_controls(picam2, False)
+                _apply_still_quality_controls(picam2)
+                time.sleep(2.0)
+                probe_rgb  = picam2.capture_array()
+                probe_meta = picam2.capture_metadata()
+                brightness = _measure_brightness(probe_rgb)
+                night      = brightness < NIGHT_BRIGHTNESS_THRESHOLD
+                log.info(f"Auto-Erkennung: Helligkeit {brightness:.1f} "
+                         f"(Schwelle {NIGHT_BRIGHTNESS_THRESHOLD}) -> "
+                         f"{'Nacht' if night else 'Tag'}modus")
+                with state_lock:
+                    if state["night_mode"] != night:
+                        state["night_mode"] = night
+                        _save_state(state)
+
+                if night:
+                    # Für die eigentliche Aufnahme mit Nacht-Controls neu belichten
+                    _apply_night_controls(picam2, True)
+                    _apply_still_quality_controls(picam2)
+                    time.sleep(3.0)
+                    img_rgb = picam2.capture_array()
+                    meta    = picam2.capture_metadata()
+                else:
+                    img_rgb = probe_rgb   # Probe war bereits die Tagaufnahme
+                    meta    = probe_meta
+        else:
+            with state_lock:
+                night = state["night_mode"] if night_capture_enabled else False
+            _apply_night_controls(picam2, night)   # Controls nach configure() setzen!
+            _apply_still_quality_controls(picam2)
+            time.sleep(3.0 if night else 2.0)       # Belichtung einpendeln
+            img_rgb = picam2.capture_array()
+            meta    = picam2.capture_metadata()
+
+        picam2.stop()
+
+        if img_rgb is None or img_rgb.size == 0:
+            raise ValueError("capture_array lieferte leeres Array")
+
+        final_brightness = _measure_brightness(img_rgb)
+        if final_brightness < MIN_USABLE_BRIGHTNESS:
+            log.warning(f"Aufnahme verworfen: zu dunkel für eine verwertbare Aufnahme "
+                        f"(Helligkeit {final_brightness:.1f} < {MIN_USABLE_BRIGHTNESS}).")
+            with state_lock:
+                state["error"] = "Zu dunkel für eine verwertbare Aufnahme -- Aufnahme übersprungen."
+            return None
+
+        ts   = time.strftime("%Y%m%d_%H%M%S")
+        mode = "nacht" if night else "tag"
+        path = os.path.join(SAVE_DIR, f"bild_{mode}_{ts}.jpg")
+        if not cv2.imwrite(path, cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)):
+            raise IOError(f"cv2.imwrite fehlgeschlagen: {path}")
+
+        capture_meta = _extract_capture_meta(meta)
+
+        with state_lock:
+            state["last_image_path"]  = path
+            state["images_captured"] += 1
+            state["error"]            = None
+            state["last_capture_meta"] = capture_meta
+            _save_state(state)
+
+        log.info(f"Bild #{state['images_captured']} [{mode}]: {path} | "
+                 f"ExposureTime={capture_meta.get('ExposureTime')}µs "
+                 f"AnalogueGain={capture_meta.get('AnalogueGain')}")
+        return img_rgb
+
+    except Exception as e:
+        log.error(f"Aufnahmefehler: {e}")
+        with state_lock:
+            state["error"] = str(e)
+        return None
+
+    finally:
+        # Stream immer wieder starten -- auch nach Fehler
+        if was_live:
+            live_stop.clear()
+            _start_live_thread()
+
+
+# =============================================================================
+# LIVE-STREAM  --  MJPEG via /video_feed
+# =============================================================================
+
+def _live_worker():
+    global live_frame_jpg
+    if not CAMERA_AVAILABLE or picam2 is None:
+        return
+    try:
+        picam2.configure(_preview_cfg())
+        picam2.start()
+        # Nachtmodus auch im Stream anwenden (nur wenn Master-Schalter aktiv)
+        with state_lock:
+            night = state["night_mode"] if state["night_capture_enabled"] else False
+        _apply_night_controls(picam2, night, continuous_af=True)
+        log.info("Live-Stream gestartet.")
+        while not live_stop.is_set():
+            frame_rgb = picam2.capture_array()
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            ok, jpg = cv2.imencode('.jpg', frame_bgr,
+                                   [cv2.IMWRITE_JPEG_QUALITY, 72])
+            if ok:
+                with live_frame_lock:
+                    live_frame_jpg = jpg.tobytes()
+            live_stop.wait(timeout=0.07)   # ~14 fps
+        picam2.stop()
+        log.info("Live-Stream gestoppt.")
+    except Exception as e:
+        log.error(f"Live-Stream-Fehler: {e}")
+
+
+def _start_live_thread():
+    global live_thread
+    if live_thread and live_thread.is_alive():
+        return
+    live_stop.clear()
+    live_thread = threading.Thread(target=_live_worker, daemon=True)
+    live_thread.start()
+
+
+def _mjpeg_gen():
+    while True:
+        with live_frame_lock:
+            frame = live_frame_jpg
+        if frame:
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+                   + frame + b'\r\n')
+        time.sleep(0.07)
+
+
+# =============================================================================
+# VORVERARBEITUNG  --  identisch zu train_and_export.py
+# =============================================================================
+
+def apply_clahe(img_rgb: np.ndarray) -> np.ndarray:
+    lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    cl = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(l)
+    return cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2RGB)
+
+
+# =============================================================================
+# TFLITE-INTERPRETER
+#
+#  inp_idx / out_idx werden DYNAMISCH aus dem Modell gelesen.
+#  Das aktuelle Modell hat inp_idx=0, out_idx=39.
+#  Hardcoding würde falsche Tensoren lesen und stille Fehler erzeugen.
+# =============================================================================
+
+def init_interpreter() -> bool:
+    global interpreter, inp_idx, out_idx
+    if not TFLITE_AVAILABLE:
+        log.warning("Kein TFLite-Backend -- bitte tflite-runtime installieren.")
+        return False
+    if not os.path.exists(TFLITE_PATH):
+        log.warning(f"Modelldatei nicht gefunden: {TFLITE_PATH}")
+        log.warning("Modell auf Pi ablegen oder TFLITE_PATH in app.py anpassen.")
+        return False
+    try:
+        interpreter = TFLiteInterpreter(model_path=TFLITE_PATH)
+        interpreter.allocate_tensors()
+
+        inp_d = interpreter.get_input_details()
+        out_d = interpreter.get_output_details()
+
+        if not inp_d or not out_d:
+            raise ValueError("Modell liefert keine Tensor-Details")
+
+        inp_idx   = inp_d[0]["index"]
+        out_idx   = out_d[0]["index"]
+        inp_shape = list(inp_d[0]["shape"])
+        inp_dtype = inp_d[0]["dtype"]
+        out_shape = list(out_d[0]["shape"])
+
+        # Plausibilitätsprüfung
+        if inp_shape != [1, IMG_SIZE, IMG_SIZE, 3]:
+            log.warning(f"Eingabe-Shape {inp_shape} weicht von erwartetem "
+                        f"[1,{IMG_SIZE},{IMG_SIZE},3] ab")
+        if inp_dtype != np.float32:
+            log.warning(f"Eingabe-Dtype ist {inp_dtype.__name__}, erwartet float32")
+        if out_shape[-1] != NUM_CLASSES:
+            log.warning(f"Ausgabe hat {out_shape[-1]} Klassen, erwartet {NUM_CLASSES}")
+
+        log.info(f"TFLite geladen [{TFLITE_BACKEND}]: {TFLITE_PATH}")
+        log.info(f"  Eingabe: idx={inp_idx}  shape={inp_shape}  dtype={inp_dtype.__name__}")
+        log.info(f"  Ausgabe: idx={out_idx}  shape={out_shape}")
+        return True
+
+    except Exception as e:
+        log.error(f"Interpreter-Init fehlgeschlagen: {e}")
+        interpreter = None
+        inp_idx = out_idx = None
+        return False
+
+
+# =============================================================================
+# INFERENZ  +  THRESHOLD-LOGIK
+# =============================================================================
+
+def run_inference(img_rgb: np.ndarray, save_json_for: "str | None" = None) -> "dict | None":
+    """
+    Führt eine Segmentierungs-Inferenz aus und wertet das Ergebnis gegen den
+    Schwellenwert aus (Relais-Entscheidung, Verlaufseintrag). Das Overlay-Bild
+    wird dauerhaft unter ABGLEICH_DIR abgelegt (Dateiname an das zugehörige
+    Originalbild angelehnt) UND zusätzlich nach LAST_OVERLAY_PATH geschrieben --
+    eine einzelne, bei jeder Inferenz überschriebene Datei für die Live-Anzeige
+    auf der Website (siehe /api/last_overlay).
+
+    save_json_for: Pfad des zugehörigen, bereits gespeicherten Originalbilds.
+    Wird dies übergeben (Automatikmodus), landet die Vorhersage zusätzlich
+    als <bildname>.json neben dem Bild -- für Annotation/Training passend
+    zum jeweiligen Foto.
+    """
+    if interpreter is None or inp_idx is None or out_idx is None:
+        log.error("run_inference: Interpreter nicht initialisiert.")
+        return None
+    try:
+        img   = apply_clahe(cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE)))
+        batch = np.expand_dims(img / 255.0, axis=0).astype(np.float32)
+
+        exp_shape = list(interpreter.get_input_details()[0]["shape"])
+        if list(batch.shape) != exp_shape:
+            raise ValueError(f"Batch-Shape {list(batch.shape)} != {exp_shape}")
+
+        t0 = time.time()
+        interpreter.set_tensor(inp_idx, batch)
+        interpreter.invoke()
+        raw = interpreter.get_tensor(out_idx)   # (1, H, W, C) float32
+        ms  = (time.time() - t0) * 1000
+
+        if raw is None or raw.size == 0:
+            raise ValueError("Leere Ausgabe vom Interpreter")
+
+        mask  = np.argmax(raw[0], axis=-1).astype(np.uint8)
+        mask  = apply_exclusion_mask(mask)   # Schnecke/Brücke hart auf Hintergrund, s.o.
+        total = mask.size
+
+        result = {
+            cls: {
+                "name":    CLASS_NAMES.get(cls, f"Klasse {cls}"),
+                "count":   int(np.sum(mask == cls)),
+                "percent": round(float(np.sum(mask == cls)) / total * 100, 1),
+            }
+            for cls in range(NUM_CLASSES)
+        }
+
+        # Overlay-Bild für die Live-Vergleichsansicht UND als Abgleich-Datei
+        color_layer = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+        for cid, bgr in CLASS_COLORS_BGR.items():
+            color_layer[mask == cid] = bgr
+        orig_bgr = cv2.resize(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR),
+                               (IMG_SIZE, IMG_SIZE))
+        overlay  = cv2.addWeighted(orig_bgr, 0.55, color_layer, 0.45, 0)
+        ok_enc, jpg = cv2.imencode('.jpg', overlay, [cv2.IMWRITE_JPEG_QUALITY, 85])
+
+        with state_lock:
+            state["last_result"]       = result
+            state["last_inference_ms"] = round(ms, 1)
+            # last_image_path bleibt unverändert (zeigt weiter auf das reguläre Bild)
+            src_path = state["last_image_path"]
+
+        # Abgleich-Overlay dauerhaft ablegen -- Dateiname an das zugehörige
+        # Originalbild angelehnt, damit beide einander eindeutig zuordenbar bleiben.
+        if ok_enc:
+            base = os.path.splitext(os.path.basename(src_path))[0] if src_path else \
+                   datetime.now().strftime("%Y%m%d_%H%M%S")
+            abgleich_path = os.path.join(ABGLEICH_DIR, f"{base}_abgleich.jpg")
+            try:
+                with open(abgleich_path, "wb") as f:
+                    f.write(jpg.tobytes())
+            except Exception as e:
+                log.warning(f"Abgleich-Bild konnte nicht gespeichert werden ({abgleich_path}): {e}")
+
+            # Zusätzlich EINE feste Temp-Datei für die Live-Anzeige auf der Website
+            # überschreiben -- kein Archiv, der Inhalt der vorherigen Inferenz ist damit
+            # automatisch weg, sobald die neue geschrieben ist ("fließender Wechsel").
+            try:
+                with open(LAST_OVERLAY_PATH, "wb") as f:
+                    f.write(jpg.tobytes())
+                with state_lock:
+                    state["overlay_version"] += 1
+            except Exception as e:
+                log.warning(f"Live-Abgleich-Bild konnte nicht geschrieben werden: {e}")
+
+        # -- Threshold-Entscheidung --------------------------------------------
+        schlamm_pct = result.get(1, {}).get("percent", 0.0)
+        with state_lock:
+            threshold  = state["threshold_pct"]
+            allow_auto = state["auto_relays_enabled"]
+
+        exceeded = schlamm_pct >= threshold
+        if exceeded and allow_auto:
+            start_or_reset_relay_timer()
+            log.info(f"Threshold überschritten: {schlamm_pct:.1f}% >= {threshold:.1f}% "
+                     f"-> Relais EIN / Timer reset")
+        elif exceeded:
+            log.info(f"Threshold ({schlamm_pct:.1f}%) überschritten, "
+                     f"aber Auto-Relais deaktiviert.")
+        else:
+            log.info(f"Threshold nicht erreicht: {schlamm_pct:.1f}% < {threshold:.1f}%")
+
+        event_history.append({
+            "ts":        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ts_unix":   time.time(),
+            "pct":       schlamm_pct,
+            "threshold": threshold,
+            "relay_on":  exceeded and allow_auto,
+            "ms":        round(ms, 1),
+        })
+
+        log.info(f"Inferenz OK: {ms:.0f} ms | Schlamm {schlamm_pct:.1f}% | "
+                 f"Hintergrund {result[0]['percent']:.1f}%")
+
+        if save_json_for:
+            json_path = os.path.splitext(save_json_for)[0] + ".json"
+            with state_lock:
+                capture_meta = state.get("last_capture_meta") or {}
+            try:
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "image":           os.path.basename(save_json_for),
+                        "timestamp":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "inference_ms":    round(ms, 1),
+                        "threshold_pct":   threshold,
+                        "relay_triggered": exceeded and allow_auto,
+                        "classes":         result,
+                        "capture_meta":    capture_meta,
+                    }, f, ensure_ascii=False, indent=2)
+                log.info(f"Vorhersage gespeichert: {json_path}")
+            except Exception as e:
+                log.warning(f"Vorhersage-JSON konnte nicht gespeichert werden ({json_path}): {e}")
+
+        return {
+            "classes":      result,
+            "inference_ms": round(ms, 1),
+        }
+
+    except Exception as e:
+        log.error(f"Inferenzfehler: {e}")
+        with state_lock:
+            state["error"] = str(e)
+        return None
+
+
+# =============================================================================
+# AUTOMATIKMODUS  --  Intervall-Thread
+# =============================================================================
+
+def _auto_loop():
+    log.info("Automatikmodus: gestartet.")
+    while not auto_stop.is_set():
+        img = capture_image(auto_detect=True)
+        if img is not None:
+            with state_lock:
+                img_path = state["last_image_path"]
+                mode     = state["auto_mode"]
+            if mode == "analyse":
+                run_inference(img, save_json_for=img_path)
+            else:
+                log.info(f"Aufnahme-Modus: nur Bild gespeichert, keine Inferenz ({img_path}).")
+        else:
+            log.warning("Automatikmodus: Aufnahme fehlgeschlagen -- "
+                        "nächster Versuch im nächsten Zyklus.")
+        with state_lock:
+            wait_s = state["interval_minutes"] * 60
+        log.info(f"Automatikmodus: nächste Aufnahme in {wait_s} s.")
+
+        # In kurzen Schritten warten statt einmal blockierend für die volle
+        # Dauer -- so greift eine Intervall-Änderung aus den Einstellungen
+        # sofort und nicht erst nach Ablauf des alten (u.U. sehr langen) Werts.
+        waited = 0.0
+        step = 0.5
+        while waited < wait_s and not auto_stop.is_set():
+            auto_stop.wait(timeout=min(step, wait_s - waited))
+            waited += step
+            with state_lock:
+                wait_s = state["interval_minutes"] * 60
+    log.info("Automatikmodus: beendet.")
+
+
+def start_auto():
+    global auto_thread
+    if auto_thread and auto_thread.is_alive():
+        log.warning("Automatikmodus bereits aktiv.")
+        return
+    auto_stop.clear()
+    auto_thread = threading.Thread(target=_auto_loop, daemon=True)
+    auto_thread.start()
+    with state_lock:
+        state["auto_active"] = True
+    log.info("Automatikmodus: Thread gestartet.")
+
+
+def stop_auto():
+    auto_stop.set()
+    with state_lock:
+        state["auto_active"] = False
+
+
+# =============================================================================
+# FLASK  --  Routen
+# =============================================================================
+
+app = Flask(__name__, template_folder="templates")
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+# -- Video ---------------------------------------------------------------------
+
+@app.route("/video_feed")
+def video_feed():
+    return Response(_mjpeg_gen(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route("/api/stream/start", methods=["POST"])
+def api_stream_start():
+    _start_live_thread()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/stream/stop", methods=["POST"])
+def api_stream_stop():
+    live_stop.set()
+    return jsonify({"ok": True})
+
+
+# -- Status --------------------------------------------------------------------
+
+@app.route("/api/status")
+def api_status():
+    _refresh_timer_remaining()
+    with state_lock:
+        s = {k: v for k, v in state.items() if k != "profiles"}
+        s["relay_state"] = dict(state["relay_state"])
+    s["camera_available"] = CAMERA_AVAILABLE
+    s["tflite_available"] = TFLITE_AVAILABLE
+    s["tflite_backend"]   = TFLITE_BACKEND
+    s["gpio_available"]   = GPIO_AVAILABLE
+    s["model_loaded"]     = interpreter is not None
+    s["model_path"]       = TFLITE_PATH
+    s["stream_active"]    = (not live_stop.is_set()
+                              and live_thread is not None
+                              and live_thread.is_alive())
+    s["history_count"]    = len(event_history)
+    s["log_count"]        = len(log_buffer)
+    return jsonify(s)
+
+
+# -- Aufnahme & Inferenz -------------------------------------------------------
+
+@app.route("/api/capture", methods=["POST"])
+def api_capture():
+    body    = request.json or {}
+    run_inf = body.get("run_inference", False)
+    img = capture_image()
+    if img is None:
+        with state_lock:
+            err = state.get("error", "Kamera nicht verfügbar")
+        return jsonify({"ok": False, "error": err}), 500
+    result = run_inference(img) if run_inf else None
+    if run_inf and result is None:
+        with state_lock:
+            err = state.get("error", "Inferenz fehlgeschlagen")
+        return jsonify({"ok": False, "error": err}), 500
+    with state_lock:
+        path = state["last_image_path"]
+        cnt  = state["images_captured"]
+    return jsonify({"ok": True, "result": result, "path": path, "count": cnt})
+
+
+@app.route("/api/inference", methods=["POST"])
+def api_inference():
+    with state_lock:
+        path = state["last_image_path"]
+    if not path or not os.path.exists(path):
+        return jsonify({"ok": False,
+                        "error": "Kein Bild vorhanden -- erst aufnehmen"}), 400
+    img_bgr = cv2.imread(path)
+    if img_bgr is None:
+        return jsonify({"ok": False, "error": f"Bild nicht lesbar: {path}"}), 500
+    result = run_inference(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+    if result is None:
+        with state_lock:
+            err = state.get("error", "Inferenz fehlgeschlagen")
+        return jsonify({"ok": False, "error": err}), 500
+    return jsonify({"ok": True, "result": result})
+
+
+@app.route("/api/last_overlay")
+def api_last_overlay():
+    """Liefert das Overlay-Bild der letzten Inferenz -- immer dieselbe Datei,
+    bei jeder neuen Inferenz überschrieben. Für die dauerhafte Live-Anzeige
+    auf der Website (bleibt sichtbar, bis eine neue Auswertung stattfindet)."""
+    if not os.path.exists(LAST_OVERLAY_PATH):
+        return jsonify({"ok": False, "error": "Noch kein Abgleich vorhanden"}), 404
+    return send_file(LAST_OVERLAY_PATH, mimetype="image/jpeg", max_age=0)
+
+
+# -- Automatikmodus ------------------------------------------------------------
+
+@app.route("/api/auto/start", methods=["POST"])
+def api_auto_start():
+    body = request.json or {}
+    with state_lock:
+        if "minutes" in body:
+            state["interval_minutes"] = max(1, int(body["minutes"]))
+    start_auto()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auto/stop", methods=["POST"])
+def api_auto_stop():
+    stop_auto()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auto/mode", methods=["POST"])
+def api_auto_mode():
+    """Umschalter für den Automatikmodus: 'aufnahme' = nur fotografieren,
+    'analyse' = fotografieren + Inferenz/Schwellenwert-Auswertung (Standard)."""
+    mode = (request.json or {}).get("mode")
+    if mode not in ("aufnahme", "analyse"):
+        return jsonify({"ok": False, "error": "mode muss 'aufnahme' oder 'analyse' sein"}), 400
+    with state_lock:
+        state["auto_mode"] = mode
+        _save_state(state)
+    log.info(f"Automatikmodus-Modus: {mode}")
+    return jsonify({"ok": True})
+
+
+# -- Einstellungen -------------------------------------------------------------
+
+@app.route("/api/settings", methods=["POST"])
+def api_settings():
+    body = request.json or {}
+    with state_lock:
+        if "threshold_pct"       in body:
+            state["threshold_pct"]       = float(body["threshold_pct"])
+        if "relay_duration_s"    in body:
+            state["relay_duration_s"]    = max(1, int(body["relay_duration_s"]))
+        if "interval_minutes"    in body:
+            state["interval_minutes"]    = max(1, int(body["interval_minutes"]))
+        if "auto_relays_enabled" in body:
+            state["auto_relays_enabled"] = bool(body["auto_relays_enabled"])
+        _save_state(state)
+    log.info(f"Einstellungen gespeichert: {body}")
+    return jsonify({"ok": True})
+
+
+# -- Relais --------------------------------------------------------------------
+
+@app.route("/api/relay", methods=["POST"])
+def api_relay():
+    body    = request.json or {}
+    name    = body.get("name")
+    on      = bool(body.get("on", False))
+    targets = [name] if name in RELAY_PINS else None
+    if on:
+        relays_on(targets)
+    else:
+        relays_off(targets)
+    with state_lock:
+        rs = dict(state["relay_state"])
+    return jsonify({"ok": True, "relay_state": rs})
+
+
+# -- Nachtmodus ----------------------------------------------------------------
+
+@app.route("/api/nightmode", methods=["POST"])
+def api_nightmode():
+    enabled = bool((request.json or {}).get("enabled", False))
+    with state_lock:
+        if enabled and not state["night_capture_enabled"]:
+            return jsonify({
+                "ok": False,
+                "error": "Nachtaufnahmen sind deaktiviert -- zuerst den Schalter "
+                         ""Nachtaufnahmen ermöglichen" aktivieren.",
+            }), 400
+        state["night_mode"] = enabled
+        _save_state(state)   # Nachtmodus persistieren
+
+    # Wenn Kamera gerade läuft (Live-Stream), Controls sofort anwenden
+    if picam2 is not None and not live_stop.is_set():
+        _apply_night_controls(picam2, enabled)
+
+    log.info(f"Nachtmodus: {'EIN' if enabled else 'AUS'}")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/nightcapture", methods=["POST"])
+def api_nightcapture():
+    """
+    Master-Schalter für Nachtaufnahmen. Aus (Standard): jede Aufnahme --
+    manuell wie automatisch -- läuft im Tagmodus, unabhängig von night_mode
+    oder gemessener Helligkeit; Nachtaufnahmen sind aktuell nicht nötig.
+    Ein: schaltet die Möglichkeit frei, der manuelle Nachtmodus-Schalter und
+    die automatische Helligkeits-Erkennung greifen dann wieder wie gewohnt.
+    """
+    enabled = bool((request.json or {}).get("enabled", False))
+    with state_lock:
+        state["night_capture_enabled"] = enabled
+        if not enabled:
+            state["night_mode"] = False
+        night = state["night_mode"]
+        _save_state(state)
+
+    if picam2 is not None and not live_stop.is_set():
+        _apply_night_controls(picam2, night, continuous_af=True)
+
+    log.info(f"Nachtaufnahmen (Master-Schalter): {'EIN' if enabled else 'AUS'}")
+    return jsonify({"ok": True})
+
+
+# -- History -------------------------------------------------------------------
+
+@app.route("/api/history")
+def api_history():
+    n = len(event_history)
+    try:
+        raw_limit = request.args.get("limit", "")
+        limit = int(raw_limit) if raw_limit else n
+        limit = min(max(1, limit), n) if limit > 0 else n
+    except ValueError:
+        limit = n
+    events = list(event_history)[-limit:]
+    return jsonify({"ok": True, "events": events, "total": n})
+
+
+@app.route("/api/history/clear", methods=["POST"])
+def api_history_clear():
+    event_history.clear()
+    log.info("Event-History geleert.")
+    return jsonify({"ok": True})
+
+
+# -- Log  (inkrementell, kein Zeilenlimit) -------------------------------------
+
+@app.route("/api/log")
+def api_log():
+    """
+    Gibt Log-Zeilen aus dem RAM-Puffer zurück.
+    ?offset=N  -> nur Zeilen ab Index N (für inkrementelles Nachladen)
+    Kein hardcodiertes Limit -- das Frontend entscheidet wie viel es anzeigt.
+    """
+    try:
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        offset = 0
+    lines = list(log_buffer)
+    total = len(lines)
+    return jsonify({
+        "ok":     True,
+        "lines":  lines[offset:],
+        "total":  total,
+        "offset": offset,
+    })
+
+
+# -- Profile -------------------------------------------------------------------
+
+@app.route("/api/profiles")
+def api_profiles():
+    with state_lock:
+        profiles = list(state["profiles"])
+    return jsonify({"ok": True, "profiles": profiles})
+
+
+@app.route("/api/profiles/save", methods=["POST"])
+def api_profiles_save():
+    body = request.json or {}
+    idx  = int(body.get("index", -1))
+    if not (0 <= idx <= 2):
+        return jsonify({"ok": False, "error": "Index muss 0, 1 oder 2 sein"}), 400
+    with state_lock:
+        prof = {
+            "name":              str(body.get("name", f"Profil {idx+1}"))[:32],
+            "threshold_pct":     float(body.get("threshold_pct",     state["threshold_pct"])),
+            "relay_duration_s":  int(body.get("relay_duration_s",    state["relay_duration_s"])),
+            "interval_minutes":  int(body.get("interval_minutes",     state["interval_minutes"])),
+            "auto_relays_enabled": bool(body.get("auto_relays_enabled", state["auto_relays_enabled"])),
+        }
+        state["profiles"][idx] = prof
+        _save_profiles(state["profiles"])
+    log.info(f"Profil {idx} gespeichert: {prof['name']}")
+    return jsonify({"ok": True, "profile": prof})
+
+
+@app.route("/api/profiles/load", methods=["POST"])
+def api_profiles_load():
+    body = request.json or {}
+    idx  = int(body.get("index", -1))
+    if not (0 <= idx <= 2):
+        return jsonify({"ok": False, "error": "Index muss 0, 1 oder 2 sein"}), 400
+    with state_lock:
+        prof = state["profiles"][idx]
+        if not prof:
+            return jsonify({"ok": False, "error": "Kein Profil an diesem Slot"}), 404
+        state["threshold_pct"]       = float(prof.get("threshold_pct",     state["threshold_pct"]))
+        state["relay_duration_s"]    = int(prof.get("relay_duration_s",    state["relay_duration_s"]))
+        state["interval_minutes"]    = int(prof.get("interval_minutes",     state["interval_minutes"]))
+        state["auto_relays_enabled"] = bool(prof.get("auto_relays_enabled", state["auto_relays_enabled"]))
+        _save_state(state)
+    log.info(f"Profil {idx} geladen: {prof['name']}")
+    return jsonify({"ok": True, "profile": prof})
+
+
+@app.route("/api/profiles/delete", methods=["POST"])
+def api_profiles_delete():
+    body = request.json or {}
+    idx  = int(body.get("index", -1))
+    if not (0 <= idx <= 2):
+        return jsonify({"ok": False, "error": "Index muss 0, 1 oder 2 sein"}), 400
+    with state_lock:
+        state["profiles"][idx] = None
+        _save_profiles(state["profiles"])
+    log.info(f"Profil {idx} gelöscht.")
+    return jsonify({"ok": True})
+
+
+# -- Reset ---------------------------------------------------------------------
+
+@app.route("/api/reset", methods=["POST"])
+def api_reset():
+    try:
+        stop_auto()
+        live_stop.set()
+        with state_lock:
+            state["timer_expires_at"]  = None
+            state["timer_remaining_s"] = 0
+        relays_off()
+        event_history.clear()
+        with state_lock:
+            state["threshold_pct"]       = 50.0
+            state["relay_duration_s"]    = 30
+            state["interval_minutes"]    = 5
+            state["auto_relays_enabled"] = True
+            state["error"]               = None
+            _save_state(state)
+        log.info("System-Reset durchgeführt.")
+        return jsonify({"ok": True})
+    except Exception as e:
+        log.error(f"Reset-Fehler: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# START
+# =============================================================================
+
+if __name__ == "__main__":
+    log.info("=" * 60)
+    log.info("=== System-Start ===")
+    log.info(f"TFLite-Backend : {TFLITE_BACKEND}")
+    log.info(f"Modellpfad     : {TFLITE_PATH}")
+    log.info(f"Kamera         : {'verfügbar' if CAMERA_AVAILABLE else 'NICHT verfügbar'}")
+    log.info(f"GPIO           : {'verfügbar' if GPIO_AVAILABLE else 'NICHT verfügbar'}")
+    log.info(f"Nachtmodus     : {'EIN' if state['night_mode'] else 'AUS'} (persistiert)")
+    log.info("=" * 60)
+    init_gpio()
+    init_camera()
+    init_interpreter()
+    try:
+        app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    finally:
+        cleanup_gpio()
+        log.info("=== System-Stop ===")
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python, caption=Trainingsskript für das U-Net-Segmentierungsmodell (code\_train.py) -- Datenaufbereitung\, Training\, Evaluierung und TFLite-Export, label=lst:code_train]
+# =============================================================================
+#  TRAINING-RECHNER  --  train_and_export.py
+#  Trainiert das U-Net und exportiert ein optimiertes .tflite-Modell
+# =============================================================================
+
+#Weitere Möglichkeiten:
+    #von relu auf relu6 umsteigen?
+    #dropout anpassen
+    #
+
+import os
+import glob
+import json
+import datetime
+import numpy as np
+import cv2
+import tensorflow as tf
+import matplotlib
+matplotlib.use("Agg")   # headless: kein Display verfügbar, nur Dateien speichern
+import matplotlib.pyplot as plt
+from tensorflow.keras import layers, models
+
+# ----------------------------------------------------------------------
+# KONFIGURATION
+# ----------------------------------------------------------------------
+
+DATA_DIR    = "/home/oem/Desktop/Echte Bilder/Erster Batch/"  # Bilder + labelme-JSON im selben Ordner
+OUTPUT_DIR  = "/home/oem/Desktop/CVAT/models/"
+LOG_DIR     = "/home/oem/Desktop/VS Code Erweiterungen/logs/fit/"
+WEIGHTS_PATH= "/home/oem/Desktop/weights_mobilenet_v3_small_224_1.0_float.h5"
+
+IMG_SIZE    = 224
+NUM_CLASSES = 2
+EPOCHS      = 100        # reduziert von 1500: CPU-Training, mit EarlyStopping (patience=15)
+                          # für den ersten Durchlauf ausreichend; bei Bedarf später erhöhen
+BATCH_SIZE  = 8
+
+# Echter 3-Wege-Split (~70/15/15) statt nur Train/Validation: Validation steuert
+# ausschließlich Early Stopping/Checkpoint-Auswahl, Test bleibt bis zur finalen
+# Erfolgsmessung komplett unberührt -- sonst fließt das Validation-Set indirekt in die
+# Modellauswahl ein und die berichteten Metriken sind zu optimistisch.
+VAL_SPLIT   = 0.15
+TEST_SPLIT  = 0.15
+RANDOM_SEED = 42          # fester Seed: reproduzierbarer Split über mehrere Läufe hinweg
+
+MODEL_TAG   = "test"      # kennzeichnet Modelle aus diesem Lauf (echter Test-Split) beim Export
+
+CLASS_NAMES     = {0: "Hintergrund", 1: "Schlamm"}
+CLASS_COLORS    = {0: (0, 0, 0), 1: (0, 200, 80)}
+LABEL_TO_CLASS  = {"Hintergrund": 0, "Schlamm": 1}   # labelme-Label -> Masken-Klassenindex
+
+# Geometrische Ausschlusszone: Schnecke und Brücke sind fest montiert und liegen in JEDEM
+# Bild im selben Bereich. Die vorige Version schnitt dafür pauschal ab einem festen
+# Bildbreiten-Anteil senkrecht durch das ganze Bild ab -- das war zu grob (Kamera-Perspektive
+# lässt die Grenze schräg verlaufen) und hat dadurch zu viel echte Schlamm-Fläche mit
+# ausgeblendet. Stattdessen wird hier exakt (1:1) das Hintergrund-Polygon aus der
+# Referenzannotation bild_tag_20260804_114627.json übernommen (Eckpunkte auf Bildbreite/
+# -höhe normiert, damit es unabhängig von der tatsächlichen Bildauflösung passt):
+EXCLUSION_POLYGON_NORM = [
+    (0.594370, 0.000087),
+    (0.496390, 1.000000),
+    (0.997833, 1.000000),
+    (0.997833, 0.000000),
+]
+
+
+def apply_exclusion_mask(pred_mask: np.ndarray) -> np.ndarray:
+    """Erzwingt Hintergrund (Klasse 0) im festen Schnecke/Brücke-Bereich, unabhängig von der
+    Modellvorhersage. pred_mask: (H, W) Klassenmaske."""
+    h, w = pred_mask.shape[:2]
+    pts = np.array([(round(x * w), round(y * h)) for x, y in EXCLUSION_POLYGON_NORM], dtype=np.int32)
+    # cv2.fillPoly kennt kein int64 (Standard-dtype von np.argmax) -- über int32 zeichnen und
+    # danach zurückwandeln, damit der Original-dtype der Maske erhalten bleibt.
+    masked = pred_mask.astype(np.int32).copy()
+    cv2.fillPoly(masked, [pts], 0)
+    return masked.astype(pred_mask.dtype)
+
+
+# ----------------------------------------------------------------------
+# DATEN LADEN
+# ----------------------------------------------------------------------
+
+def apply_clahe(img: np.ndarray) -> np.ndarray:
+    """CLAHE-Kontrastverbesserung im LAB-Farbraum."""
+    lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    cl = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(l)
+    return cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2RGB)
+
+
+def rasterize_labelme_mask(json_path: str, shape_hw: tuple) -> np.ndarray:
+    """Rastert die Polygone einer labelme-JSON in eine Klassenmaske (H, W).
+    Hintergrund-Polygon wird zuerst gezeichnet, danach Schlamm-Polygone --
+    dadurch überschreiben Schlamm-Flächen etwaige Überlappungen korrekt."""
+    h, w = shape_hw[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)
+    with open(json_path, encoding="utf-8") as f:
+        d = json.load(f)
+    for s in d["shapes"]:
+        cls = LABEL_TO_CLASS.get(s["label"])
+        if cls is None:
+            continue
+        pts = np.array(s["points"], dtype=np.int32)
+        if pts.shape[0] < 3:
+            continue
+        cv2.fillPoly(mask, [pts], cls)
+    return mask
+
+
+def load_data(data_dir: str):
+    """Lädt Bild+labelme-JSON-Paare direkt aus einem gemeinsamen Ordner
+    (Kamera_Bilder) statt aus vorberechneten CVAT-Segmentierungsmasken."""
+    json_files = sorted(glob.glob(os.path.join(data_dir, "*.json")))
+    print(f"Suche Bild-Annotation-Paare für {len(json_files)} JSON-Dateien ...")
+
+    images, masks = [], []
+    skipped = 0
+    for jf in json_files:
+        with open(jf, encoding="utf-8") as f:
+            d = json.load(f)
+        img_path = os.path.join(data_dir, d["imagePath"])
+        img_bgr = cv2.imread(img_path)
+        if img_bgr is None:
+            skipped += 1
+            continue
+
+        mask_full = rasterize_labelme_mask(jf, img_bgr.shape)
+
+        img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        img = apply_clahe(cv2.resize(img, (IMG_SIZE, IMG_SIZE)))
+        images.append(img / 255.0)
+
+        mask = cv2.resize(mask_full, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_NEAREST)
+        masks.append(mask)
+
+    if skipped:
+        print(f"WARNUNG: {skipped} JSON-Dateien ohne lesbares Bild übersprungen.")
+    if len(images) == 0:
+        raise ValueError(f"Keine passenden Bild-Annotation-Paare gefunden in {data_dir}")
+
+    X = np.array(images, dtype=np.float32)
+    y = np.array(masks,  dtype=np.int32)  # Strikt int32
+    print(f"Geladen: {X.shape[0]} Paare  --  X: {X.shape}  y: {y.shape}")
+    return X, y
+
+
+def split_data(X: np.ndarray, y: np.ndarray, val_split: float, test_split: float, seed: int):
+    """Zufälliger, seed-fixierter 3-Wege-Split (Train/Validation/Test).
+    Wichtig: Test wird hier abgetrennt und danach nirgends mehr für Training oder
+    Checkpoint-Auswahl verwendet -- nur für die abschließende, einmalige Erfolgsmessung."""
+    n = len(X)
+    rng = np.random.RandomState(seed)
+    idx = rng.permutation(n)
+
+    n_test  = max(1, int(n * test_split))
+    n_val   = max(1, int(n * val_split))
+    n_train = n - n_val - n_test
+    if n_train <= 0:
+        raise ValueError("Zu wenige Daten für einen 3-Wege-Split! Erhöhe die Anzahl der Bilder.")
+
+    idx_test  = idx[:n_test]
+    idx_val   = idx[n_test:n_test + n_val]
+    idx_train = idx[n_test + n_val:]
+
+    print(f"Split: {len(idx_train)} Training | {len(idx_val)} Validation | {len(idx_test)} Test "
+          f"(Seed={seed})")
+
+    return (X[idx_train], y[idx_train],
+            X[idx_val],   y[idx_val],
+            X[idx_test],  y[idx_test])
+
+
+# ----------------------------------------------------------------------
+# MODELL (U-NET)
+# ----------------------------------------------------------------------
+
+#leaky relu alternative
+
+def my_leaky_relu(x):
+    return tf.nn.leaky_relu(x, alpha=0.01)
+
+#original activation="relu"
+def build_unet(input_shape: tuple, num_classes: int) -> tf.keras.Model:
+    inputs = layers.Input(input_shape)
+
+    # Encoder
+    c1 = layers.Conv2D(32,  (3, 3), activation="relu", padding="same")(inputs)
+    p1 = layers.MaxPooling2D((2, 2))(c1)
+
+    layers.Dropout(0.25)
+
+    c2 = layers.Conv2D(64,  (3, 3), activation="relu", padding="same")(p1)
+    p2 = layers.MaxPooling2D((2, 2))(c2)
+
+    # Bottleneck
+    bn = layers.Conv2D(128, (3, 3), activation="relu", padding="same")(p2)
+
+    # Decoder
+    u1 = layers.Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same", activation="relu")(bn)
+    c3 = layers.Conv2D(64,  (3, 3), activation="relu", padding="same")(u1)
+
+    layers.Dropout(0.25)
+
+    u2 = layers.Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same", activation="relu")(c3)
+    c4 = layers.Conv2D(32,  (3, 3), activation="relu", padding="same")(u2)
+
+    layers.Dropout(0.5)
+
+    outputs = layers.Conv2D(num_classes, (1, 1), activation="softmax")(c4)
+    return models.Model(inputs, outputs, name="unet_segmentation")
+
+
+# ----------------------------------------------------------------------
+# PIPELINE & AUGMENTIERUNG
+# ----------------------------------------------------------------------
+
+def augment(image: tf.Tensor, mask: tf.Tensor) -> tuple:
+    """
+    Sichere Augmentierung. Erwartet mask mit Shape (H, W).
+    """
+    seed = tf.random.uniform(shape=(2,), maxval=2**31, dtype=tf.int64)
+
+    # Für die tf.image-Funktionen temporär eine Kanal-Dimension hinzufügen (H, W, 1)
+    mask_expanded = tf.expand_dims(mask, axis=-1)
+
+    # Spiegeln
+    image         = tf.image.stateless_random_flip_left_right(image, seed=seed)
+    mask_expanded = tf.image.stateless_random_flip_left_right(mask_expanded, seed=seed)
+
+    # Crop & Resize
+    crop_h = tf.cast(IMG_SIZE * 0.9, tf.int32)
+    crop_w = tf.cast(IMG_SIZE * 0.9, tf.int32)
+    
+    combined = tf.concat([image, tf.cast(mask_expanded, tf.float32)], axis=-1)
+    combined = tf.image.stateless_random_crop(combined, size=(crop_h, crop_w, 4), seed=seed)
+    combined = tf.image.resize(combined, (IMG_SIZE, IMG_SIZE), method="bilinear")
+    
+    image = combined[:, :, :3]
+    mask_expanded = combined[:, :, 3:4]
+    
+    # Runden und zurück zu int32
+    mask_expanded = tf.math.round(mask_expanded)
+    mask_expanded = tf.cast(mask_expanded, tf.int32)
+
+    # Farb-Augmentierung nur auf dem Bild
+    image = tf.image.stateless_random_brightness(image, max_delta=0.1, seed=seed)
+    image = tf.image.stateless_random_contrast(image, lower=0.9, upper=1.1, seed=seed)
+    image = tf.clip_by_value(image, 0.0, 1.0)
+
+    # WICHTIG: Maske wieder "squeezen" zu (H, W) für sparse_categorical_crossentropy
+    mask = tf.squeeze(mask_expanded, axis=-1)
+
+    # Shapes explizit fixieren
+    image.set_shape([IMG_SIZE, IMG_SIZE, 3])
+    mask.set_shape([IMG_SIZE, IMG_SIZE])
+
+    return image, mask
+
+
+def make_dataset(X: np.ndarray, y: np.ndarray, augment_data: bool, batch_size: int,
+                  class_weights: "tf.Tensor | None" = None) -> tf.data.Dataset:
+    # y wird hier explizit auf (H, W) abgesichert, falls es noch (H, W, 1) war
+    if len(y.shape) == 4:
+        y = np.squeeze(y, axis=-1)
+
+    ds = tf.data.Dataset.from_tensor_slices((X, y))
+
+    if augment_data:
+        ds = ds.shuffle(buffer_size=len(X), reshuffle_each_iteration=True)
+        ds = ds.map(augment, num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.repeat()
+    else:
+        # Auch für Val-Set Shapes garantieren
+        def set_val_shapes(img, msk):
+            img.set_shape([IMG_SIZE, IMG_SIZE, 3])
+            msk.set_shape([IMG_SIZE, IMG_SIZE])
+            return img, msk
+        ds = ds.map(set_val_shapes, num_parallel_calls=tf.data.AUTOTUNE)
+
+    if class_weights is not None:
+        # Pixelweise Gewichtung nach Augmentierung anwenden (Gewicht hängt nur vom
+        # finalen Maskenwert ab, nicht von geometrischen Transformationen davor) --
+        # sparse_categorical_crossentropy unterstützt kein class_weight direkt bei
+        # Dense-/Pixel-Vorhersagen, daher stattdessen ein Sample-Weight-Tensor pro Pixel.
+        def add_sample_weight(img, msk):
+            return img, msk, tf.gather(class_weights, msk)
+        ds = ds.map(add_sample_weight, num_parallel_calls=tf.data.AUTOTUNE)
+
+    ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    return ds
+
+
+# ----------------------------------------------------------------------
+# TRAINING
+# ----------------------------------------------------------------------
+
+def train(X_train: np.ndarray, y_train: np.ndarray,
+          X_val: np.ndarray, y_val: np.ndarray) -> tf.keras.Model:
+    model = build_unet((IMG_SIZE, IMG_SIZE, 3), NUM_CLASSES)
+    model.load_weights(
+                WEIGHTS_PATH, by_name=True, skip_mismatch=True)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=3e-4),
+                loss="sparse_categorical_crossentropy",
+                metrics=["accuracy"])
+    model.summary()
+
+    n_train = len(X_train)
+    print(f"Training: {n_train} Bilder  |  Validierung: {len(X_val)} Bilder")
+
+    # Schlamm ist stark unterrepräsentiert (~11% der Pixel, s. Datenanalyse) -- ohne
+    # Gewichtung kollabiert das Modell auf "immer Hintergrund" (val_accuracy bleibt dann
+    # exakt bei der Hintergrund-Pixelquote konstant, unabhängig vom Trainingsfortschritt).
+    # Gedämpfte Wurzel-Gewichtung (~3x) war bei diesem kleinen Datensatz zu schwach und
+    # kollabierte ebenfalls; volle inverse Frequenz (~10x) mit der Standard-Lernrate war
+    # zu aggressiv und kippte ins Gegenteil. Volle Gewichtung + niedrigere Lernrate (s.u.)
+    # ist der stabilere Kompromiss.
+    class_counts   = np.bincount(y_train.flatten(), minlength=NUM_CLASSES).astype(np.float64)
+    class_weights  = class_counts.sum() / (NUM_CLASSES * np.maximum(class_counts, 1))
+    print(f"Klassen-Pixelanteile (Training): {(class_counts / class_counts.sum()).round(3)}")
+    print(f"Klassen-Gewichte:                {class_weights.round(3)}")
+    class_weights_tf = tf.constant(class_weights, dtype=tf.float32)
+
+    train_ds = make_dataset(X_train, y_train, augment_data=True,  batch_size=BATCH_SIZE, class_weights=class_weights_tf)
+    val_ds   = make_dataset(X_val,   y_val,   augment_data=False, batch_size=BATCH_SIZE, class_weights=class_weights_tf)
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR,    exist_ok=True)
+    log_path = os.path.join(LOG_DIR, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+    # Steps berechnen
+    steps_per_epoch = max(1, n_train // BATCH_SIZE)
+
+    model.fit(
+        train_ds,
+        steps_per_epoch=steps_per_epoch,
+        validation_data=val_ds,
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        verbose=2,
+        callbacks=[
+            tf.keras.callbacks.TensorBoard(log_dir=log_path, histogram_freq=1
+            ),
+            tf.keras.callbacks.ModelCheckpoint(
+                filepath=os.path.join(OUTPUT_DIR, "best_model1.keras"),
+                save_best_only=True, monitor="val_loss", verbose=1,
+            ),
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True,
+            ),
+        ],
+    )
+    return model
+
+
+# ----------------------------------------------------------------------
+# EVALUATION  (nur auf dem Test-Set, nie zuvor für Training/Checkpoint-Auswahl gesehen)
+# ----------------------------------------------------------------------
+
+def evaluate(model: tf.keras.Model, X_test: np.ndarray, y_test: np.ndarray) -> dict:
+    """Berechnet pro Klasse IoU/Precision/Recall/F1 sowie die mittlere vom Modell
+    vergebene Erkennungswahrscheinlichkeit (Softmax-Konfidenz) für die jeweils
+    korrekte Klasse -- getrennt ausgewertet für Hintergrund- und Schlamm-Pixel."""
+    probs = model.predict(X_test, verbose=0)
+    preds = np.argmax(probs, axis=-1)
+    preds = np.array([apply_exclusion_mask(p) for p in preds])
+
+    results = {}
+    for cls, name in CLASS_NAMES.items():
+        tp = np.sum((preds == cls) & (y_test == cls))
+        fp = np.sum((preds == cls) & (y_test != cls))
+        fn = np.sum((preds != cls) & (y_test == cls))
+        iou       = tp / (tp + fp + fn + 1e-9)
+        precision = tp / (tp + fp + 1e-9)
+        recall    = tp / (tp + fn + 1e-9)
+        f1        = 2 * precision * recall / (precision + recall + 1e-9)
+        mean_conf = float(probs[..., cls][y_test == cls].mean()) if np.any(y_test == cls) else float("nan")
+        results[name] = {
+            "iou": float(iou), "precision": float(precision),
+            "recall": float(recall), "f1": float(f1),
+            "mean_confidence": mean_conf,
+        }
+
+    pixel_acc = float(np.mean(preds == y_test))
+    results["pixel_accuracy"] = pixel_acc
+
+    print(f"\n-- Test-Set-Evaluation ({len(X_test)} Bilder, nie für Training/Checkpoint verwendet) --")
+    for name in CLASS_NAMES.values():
+        r = results[name]
+        print(f"  {name:12s} IoU={r['iou']:.3f}  Precision={r['precision']:.3f}  "
+              f"Recall={r['recall']:.3f}  F1={r['f1']:.3f}  "
+              f"mittl. Erkennungswahrscheinlichkeit={r['mean_confidence']:.3f}")
+    print(f"  Pixel-Accuracy (gesamt): {pixel_acc:.3f}")
+    return results
+
+
+# ----------------------------------------------------------------------
+# EXPORT
+# ----------------------------------------------------------------------
+
+def export(model: tf.keras.Model, X_sample: np.ndarray) -> str:
+    ts          = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    keras_path  = os.path.join(OUTPUT_DIR, f"model_{MODEL_TAG}_{ts}.keras")
+    tflite_path = os.path.join(OUTPUT_DIR, f"model_{MODEL_TAG}_{ts}_int8.tflite")
+
+    model.save(keras_path)
+    print(f"Keras-Modell gespeichert:  {keras_path}")
+
+    #sample = X_sample[:min(100, len(X_sample))].astype(np.float32)
+    #def representative_dataset():
+    #    for img in sample:
+    #        yield [np.expand_dims(img, self._interpreter == _interpreter_wrapper.CreateWrapperFromFile(axis=0))] #Hat zuletzt Fehlermeldung ausgegeben
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations            = [tf.lite.Optimize.DEFAULT]
+    #converter.representative_dataset   = representative_dataset
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS,
+                                           tf.lite.OpsSet.SELECT_TF_OPS]
+    converter.inference_input_type     = tf.float32   
+    converter.inference_output_type    = tf.float32   
+
+    with open(tflite_path, "wb") as f:
+        f.write(converter.convert())
+    print(f"TFLite-Modell gespeichert: {tflite_path}")
+    return tflite_path
+
+
+# ----------------------------------------------------------------------
+# VISUALISIERUNG
+# ----------------------------------------------------------------------
+
+def visualize_training(model: tf.keras.Model, X: np.ndarray, y: np.ndarray, num_samples: int = 3) -> None:
+    num_samples = min(num_samples, len(X))
+    preds = np.argmax(model.predict(X[:num_samples]), axis=-1)
+    fig, axes = plt.subplots(num_samples, 3, figsize=(12, 4 * num_samples))
+    
+    if num_samples == 1:
+        axes = np.expand_dims(axes, axis=0)
+
+    fig.suptitle("Trainingsvergleich", fontsize=13, fontweight="bold")
+
+    for i in range(num_samples):
+        for ax, data, title, cmap in zip(
+            axes[i],
+            [X[i], y[i].squeeze(), preds[i]],
+            ["Original", "Annotation (Ground Truth)", "Vorhersage"],
+            [None, "jet", "jet"],
+        ):
+            ax.imshow(data, cmap=cmap)
+            ax.set_title(title)
+            ax.axis("off")
+
+    plt.tight_layout()
+    out = os.path.join(OUTPUT_DIR, "training_comparison.png")
+    plt.savefig(out, dpi=150)
+    plt.close(fig)   # kein Display verfügbar (headless) -- nur Datei speichern, nicht anzeigen
+    print(f"Vergleichsbild gespeichert: {out}")
+
+
+# ----------------------------------------------------------------------
+# MAIN
+# ----------------------------------------------------------------------
+
+if __name__ == "__main__":
+    X, y = load_data(DATA_DIR)
+    X_train, y_train, X_val, y_val, X_test, y_test = split_data(
+        X, y, VAL_SPLIT, TEST_SPLIT, RANDOM_SEED)
+
+    model = train(X_train, y_train, X_val, y_val)
+    evaluate(model, X_test, y_test)
+    visualize_training(model, X_test, y_test)   # Beispiele aus dem Test-Set, nicht Training
+    export(model, X_train)
+\end{lstlisting}
+
 \section{Bewertungsmetriken}
 
 Die folgenden Metriken und die Post-Training-Quantisierung werden zur Evaluierung des Segmentierungsmodells in Kapitel \ref{Tests} herangezogen.

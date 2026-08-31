@@ -101,6 +101,12 @@
 	tabsize=2,
 	breaklines=true,
 	breakatwhitespace=true,
-	prebreak={\mbox{$\hookleftarrow$}}
+	prebreak={\mbox{$\hookleftarrow$}},
+	% UTF-8-Umlaute in Code-Kommentaren (z.B. app.py, code_train.py im Anhang):
+	% "listings" verarbeitet inputenc-UTF-8 nicht nativ, daher explizite Literate-Tabelle.
+	literate=%
+		{Ä}{{\"A}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1
+		{ä}{{\"a}}1 {ö}{{\"o}}1 {ü}{{\"u}}1
+		{ß}{{\ss}}1 {µ}{{$\mu$}}1 {×}{{$\times$}}1
 }
 
