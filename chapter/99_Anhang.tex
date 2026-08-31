@@ -250,11 +250,11 @@ Die folgenden beiden Skripte bilden den Kern der in Kapitel \ref{Implementierung
 
 \begin{lstlisting}[language=Python, caption=Steuerungssoftware des Raspberry Pi (app.py) -- Kamerasteuerung\, Inferenz\, GPIO/Relaisansteuerung und Flask-Weboberfläche, label=lst:app_py]
  
-# =============================================================================
+
 #  app.py  --  Raspberry Pi Segmentierungs- & Steuerungs-Backend  (final)
 #  Start : python app.py
 #  UI    : http://localhost:5000  |  http://<pi-ip>:5000
-# =============================================================================
+
 import sys
 sys.path.append('/usr/lib/python3/dist-packages')   # libcamera für Conda-Umgebungen
 
@@ -266,7 +266,8 @@ import numpy as np
 import cv2
 from flask import Flask, jsonify, render_template, Response, request, send_file
 
-# -- Picamera2 -----------------------------------------------------------------
+# Picamera2 
+
 try:
     from picamera2 import Picamera2
     CAMERA_AVAILABLE = True
@@ -274,11 +275,6 @@ except Exception as _cam_err:
     CAMERA_AVAILABLE = False
     _cam_err_msg = str(_cam_err)
 
-# -- TFLite  (tflite_runtime bevorzugt, ai-edge-litert / volles TF als Fallback) -
-#
-#  tflite_runtime gibt es nicht mehr für aktuelle Python-Versionen.
-#  Google pflegt stattdessen "ai-edge-litert" (gleiche Interpreter-API,
-#
 try:
     from tflite_runtime.interpreter import Interpreter as TFLiteInterpreter
     TFLITE_BACKEND = "tflite_runtime"
@@ -305,9 +301,7 @@ except ImportError:
     GPIO_AVAILABLE = False
 
 
-# =============================================================================
-# KONFIGURATION  --  hier anpassen
-# =============================================================================
+# KONFIGURATION
 
 SAVE_DIR      = '/home/pi/Desktop/Kamera_Setup/Kamera_Bilder'
 ABGLEICH_DIR  = '/home/pi/Desktop/Kamera_Setup/Kamera_Abgleiche'   # Overlay-Bilder je Inferenz, dauerhaftes Archiv
@@ -399,10 +393,7 @@ else:
 
 log = logging.getLogger(__name__)
 
-
-# =============================================================================
 # PERSISTENZ  --  Zustand & Profile überleben Neustarts
-# =============================================================================
 
 def _load_state() -> dict:
     try:
@@ -456,9 +447,7 @@ def _save_profiles(profiles: list) -> bool:
         return False
 
 
-# =============================================================================
 # GLOBALER ZUSTAND
-# =============================================================================
 
 _p = _load_state()   # persistierte Werte
 
@@ -572,9 +561,7 @@ def cleanup_gpio():
             log.error(f"GPIO-Cleanup: {e}")
 
 
-# =============================================================================
-# RELAY-TIMER  --  reset-fähiger Countdown
-# =============================================================================
+# RELAY-TIMER
 
 def _timer_worker():
     """Läuft bis timer_expires_at, verlängert sich automatisch bei Reset."""
@@ -624,9 +611,8 @@ def _refresh_timer_remaining():
                 state["timer_expires_at"] = None
 
 
-# =============================================================================
-# KAMERA  --  picamera2 / Camera Module 3 NoIR
-# =============================================================================
+=====================================
+# KAMERA
 
 def init_camera() -> bool:
     global picam2
@@ -661,24 +647,7 @@ def _preview_cfg():
 
 
 def _apply_night_controls(cam, night: bool, continuous_af: bool = False):
-    """
-    Setzt Kamera-Controls für Tag- oder Nachtmodus.
-    Muss nach jedem picam2.configure() erneut aufgerufen werden,
-    weil configure() alle Controls auf Kamera-Defaults zurücksetzt.
-    Das ist der Grund warum der Automatikmodus ohne diesen Aufruf
-    immer im Tagmodus aufnimmt, auch wenn Nachtmodus aktiv ist.
-
-    continuous_af=True (Live-Stream): AfMode "Continuous" (2), damit beim
-    Justieren des Neigungswinkels (Spiegelungsminimum suchen) live
-    nachfokussiert wird -- hier ändert sich der Objektabstand während der
-    Justage tatsächlich stark, ein Suchlauf ist also nötig.
-    continuous_af=False (Stills, Default): AfMode "Manual" (0) mit fester
-    Fokusdistanz STILL_FOCUS_DISTANCE_M statt Suchlauf pro Aufnahme -- die
-    Schärfentiefe bei dieser Distanz deckt die Armvibration bereits komplett
-    ab (s. Konstanten-Kommentar), ein Autofokus-Suchlauf auf der texturarmen
-    Wasseroberfläche wäre nur eine unnötige Fehlerquelle (führte früher
-    gelegentlich zu "Autofokus: Zyklus ohne Erfolg").
-    """
+    
     try:
         if continuous_af:
             af_controls = {
@@ -760,11 +729,7 @@ def _extract_capture_meta(meta: "dict | None") -> dict:
 
 
 def _apply_still_quality_controls(cam):
-    """Zusätzliche Qualitäts-Controls nur für Einzelaufnahmen (nicht Live-Stream).
-    NoiseReductionMode="Fast" statt "HighQuality": HighQuality glättet bei wenig
-    Licht (insbesondere mit dem lichtschluckenden Polfilter + hohem AnalogueGain)
-    Kanten und feine Struktur weg -- das wirkt wie Unschärfe, ist aber Rauschglättung.
-    Fast + höheres Sharpness (siehe _apply_night_controls) erhält mehr Detail."""
+   
     try:
         cam.set_controls({"NoiseReductionMode": 1})  # 0=Off, 1=Fast, 2=HighQuality
     except Exception as e:
@@ -783,22 +748,7 @@ def _measure_brightness(img_rgb: np.ndarray) -> float:
 
 
 def capture_image(auto_detect: bool = False) -> "np.ndarray | None":
-    """
-    Einzelaufnahme. Unterbricht den Live-Stream falls aktiv,
-    wendet den aktuellen Nachtmodus an und startet den Stream danach
-    wieder -- auch im Fehlerfall.
-
-    auto_detect=True (Automatikmodus): Tag/Nacht wird nicht vom manuellen
-    Schalter übernommen, sondern anhand der gemessenen Bildhelligkeit einer
-    Tag-Probeaufnahme selbst entschieden (state["night_mode"] wird dabei
-    aktualisiert, damit UI-Anzeige und Dateiname konsistent bleiben).
-
-    Der Master-Schalter state["night_capture_enabled"] steht über beiden
-    Modi: ist er aus (Standard -- Nachtaufnahmen werden aktuell nicht
-    benötigt), wird jede Aufnahme im Tagmodus gemacht, unabhängig von
-    night_mode oder gemessener Helligkeit. Erst wenn er eingeschaltet wird,
-    greifen der manuelle Nachtmodus-Schalter bzw. die Auto-Erkennung.
-    """
+    
     if not CAMERA_AVAILABLE or picam2 is None:
         log.error("capture_image: Kamera nicht verfügbar.")
         with state_lock:
@@ -916,9 +866,9 @@ def capture_image(auto_detect: bool = False) -> "np.ndarray | None":
             _start_live_thread()
 
 
-# =============================================================================
+
 # LIVE-STREAM  --  MJPEG via /video_feed
-# =============================================================================
+
 
 def _live_worker():
     global live_frame_jpg
@@ -966,9 +916,9 @@ def _mjpeg_gen():
         time.sleep(0.07)
 
 
-# =============================================================================
+
 # VORVERARBEITUNG  --  identisch zu train_and_export.py
-# =============================================================================
+
 
 def apply_clahe(img_rgb: np.ndarray) -> np.ndarray:
     lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
@@ -977,13 +927,9 @@ def apply_clahe(img_rgb: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2RGB)
 
 
-# =============================================================================
+
 # TFLITE-INTERPRETER
-#
-#  inp_idx / out_idx werden DYNAMISCH aus dem Modell gelesen.
-#  Das aktuelle Modell hat inp_idx=0, out_idx=39.
-#  Hardcoding würde falsche Tensoren lesen und stille Fehler erzeugen.
-# =============================================================================
+
 
 def init_interpreter() -> bool:
     global interpreter, inp_idx, out_idx
@@ -1031,9 +977,9 @@ def init_interpreter() -> bool:
         return False
 
 
-# =============================================================================
+
 # INFERENZ  +  THRESHOLD-LOGIK
-# =============================================================================
+
 
 def run_inference(img_rgb: np.ndarray, save_json_for: "str | None" = None) -> "dict | None":
     """
